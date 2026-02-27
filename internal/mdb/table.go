@@ -12,9 +12,9 @@ const (
 	tdefLength        = 0x08
 	tdefNumRows       = 0x10
 	tdefAutoNum       = 0x14
-	tdefTableType     = 0x18
 	tdefMaxCols       = 0x19
 	tdefNumVarCols    = 0x1B
+	tdefTableType     = 0x28
 	tdefNumCols       = 0x2D
 	tdefNumIdxs       = 0x2F
 	tdefNumRealIdxs   = 0x33
