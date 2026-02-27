@@ -159,75 +159,84 @@ This is the foundation. We need to read the binary MDB format to access system t
 
 ## Phase 2: MSysAccessStorage Parser
 
+Status (27.02.2026): **Completed**
+
 ### 2.1 Read MSysAccessStorage table
-- [ ] Locate `MSysAccessStorage` via the MSysObjects catalog
-- [ ] Implement row decoding for: Id, ParentId, Name, Type, Lv, DateCreate, DateUpdate
-- [ ] Build an in-memory node list (and/or map by Id) suitable for tree construction
+- [x] Locate `MSysAccessStorage` via the MSysObjects catalog
+- [x] Implement row decoding for: Id, ParentId, Name, Type, Lv, DateCreate, DateUpdate
+- [x] Build an in-memory node list (and/or map by Id) suitable for tree construction
 
 ### 2.2 Navigate VBA storage tree
-- [ ] Construct the storage tree (`ROOT > VBAProject > VBA > streams`)
-- [ ] Implement lookups to find `VBAProject` and its `VBA` child folder
-- [ ] Implement lookup/extraction for required streams: `PROJECT`, `PROJECTwm`, `dir`, `_VBA_PROJECT`
-- [ ] Enumerate module streams (all other children of `VBA` folder)
+- [x] Construct the storage tree (`ROOT > VBAProject > VBA > streams`)
+- [x] Implement lookups to find `VBAProject` and its `VBA` child folder
+- [x] Implement lookup/extraction for required streams: `PROJECT`, `PROJECTwm`, `dir`, `_VBA_PROJECT`
+- [x] Enumerate module streams (all other children of `VBA` folder)
 
 ### 2.3 Extract raw stream data
-- [ ] Implement raw stream extraction by reading `Lv` (Long Value) for each stream node
-- [ ] Ensure multi-page LV assembly is correct (no gaps/duplicates)
-- [ ] Add stream-level integrity checks (detect truncation/corruption early)
+- [x] Implement raw stream extraction by reading `Lv` (Long Value) for each stream node
+- [x] Ensure multi-page LV assembly is correct (no gaps/duplicates)
+- [x] Add stream-level integrity checks (detect truncation/corruption early)
+- Result: implemented in `internal/vba/storage.go` with tests in `internal/vba/storage_test.go`
 
 ---
 
 ## Phase 3: VBA Project Structure
 
+Status (27.02.2026): **In Progress**
+
 ### 3.1 Parse PROJECT stream
-- [ ] Decode `PROJECT` stream as latin-1 text (with explicit charset handling)
-- [ ] Parse module declarations and classify module type:
-  - [ ] `Module=<name>` → standard module (.bas)
-  - [ ] `DocClass=<name>/&H00000000` → class/form module (.cls)
-  - [ ] `Class=<name>` → standalone class (.cls)
-- [ ] Parse project metadata (Name, HelpFile, Version, etc.) into a struct
-- [ ] Parse `[Host Extender Info]` section into a structured representation (or preserve as raw text)
+- [x] Decode `PROJECT` stream as latin-1 text (with explicit charset handling)
+- [x] Parse module declarations and classify module type:
+  - [x] `Module=<name>` → standard module (.bas)
+  - [x] `DocClass=<name>/&H00000000` → class/form module (.cls)
+  - [x] `Class=<name>` → standalone class (.cls)
+- [x] Parse project metadata (Name, HelpFile, Version, etc.) into a struct
+- [x] Parse `[Host Extender Info]` section into a structured representation (or preserve as raw text)
 
 ### 3.2 Parse dir stream
-- [ ] Decompress `dir` stream using MS-OVBA decompression (Phase 4 dependency)
-- [ ] Implement `dir` record parser and support required record types:
-  - [ ] `0x0019` MODULENAME: module display name
-  - [ ] `0x001A` MODULESTREAMNAME: obfuscated stream name
-  - [ ] `0x0032` MODULESTREAMNAME_UNICODE: unicode variant (skip after 0x001A)
-  - [ ] `0x0031` MODULEOFFSET: byte offset where source starts in the module stream
-  - [ ] `0x0021` MODULETYPE_PROCEDURAL: standard module
-  - [ ] `0x0022` MODULETYPE_CLASS/DOCUMENT: class module
-  - [ ] `0x002B` MODULE_TERMINATOR: end of module record
-- [ ] Build mapping: moduleName → (streamName, sourceOffset, moduleType)
+- [x] Decompress `dir` stream using MS-OVBA decompression (Phase 4 dependency)
+- [x] Implement `dir` record parser and support required record types:
+  - [x] `0x0019` MODULENAME: module display name
+  - [x] `0x001A` MODULESTREAMNAME: obfuscated stream name
+  - [x] `0x0032` MODULESTREAMNAME_UNICODE: unicode variant (skip after 0x001A)
+  - [x] `0x0031` MODULEOFFSET: byte offset where source starts in the module stream
+  - [x] `0x0021` MODULETYPE_PROCEDURAL: standard module
+  - [x] `0x0022` MODULETYPE_CLASS/DOCUMENT: class module
+  - [x] `0x002B` MODULE_TERMINATOR: end of module record
+- [x] Build mapping: moduleName → (streamName, sourceOffset, moduleType)
 
 ### 3.3 Handle Access-specific dir format
-- [ ] Document/encode assumptions about Access-specific `dir` quirks (record ordering, missing records)
-- [ ] Implement fallback mapping strategy when `dir` parsing fails (e.g. match by stream order sorted by storage Id)
-- [ ] Validate `dir` mapping against `PROJECT` module list and surface mismatches clearly
+- [x] Document/encode assumptions about Access-specific `dir` quirks (record ordering, missing records)
+- [x] Implement fallback mapping strategy when `dir` parsing fails (e.g. match by stream order sorted by storage Id)
+- [x] Validate `dir` mapping against `PROJECT` module list and surface mismatches clearly
+- Result: implemented in `internal/vba/project.go` and `internal/vba/dir.go` with tests in `internal/vba/project_dir_test.go`
 
 ---
 
 ## Phase 4: MS-OVBA Decompression
 
+Status (27.02.2026): **In Progress**
+
 ### 4.1 Implement decompression algorithm
-- [ ] Implement `DecompressContainer([]byte) ([]byte, error)` for MS-OVBA §2.4.1
-- [ ] Validate container signature byte (must be `0x01`)
-- [ ] Implement chunk header parsing (2 bytes LE):
-  - [ ] Bits 0-11: compressed chunk size - 3
-  - [ ] Bit 12-14: reserved (must be 0b011)
-  - [ ] Bit 15: 1=compressed, 0=raw
-- [ ] Implement token decoding for compressed chunks:
-  - [ ] Read flag byte (8 bits → 8 tokens)
-  - [ ] Flag bit=0: copy literal byte
-  - [ ] Flag bit=1: decode + execute copy token (2 bytes)
-- [ ] Implement copy token decoding (offset/length) based on decompressed position within chunk:
-  - [ ] Calculate `bitCount` dynamically (4-12)
-  - [ ] Compute `lengthBits = 16 - bitCount`
-  - [ ] Compute `offset = (token >> lengthBits) + 1`
-  - [ ] Compute `length = (token & ((1 << lengthBits) - 1)) + 3`
+- [x] Implement `DecompressContainer([]byte) ([]byte, error)` for MS-OVBA §2.4.1
+- [x] Validate container signature byte (must be `0x01`)
+- [x] Implement chunk header parsing (2 bytes LE):
+  - [x] Bits 0-11: compressed chunk size - 3
+  - [x] Bit 12-14: reserved (must be 0b011)
+  - [x] Bit 15: 1=compressed, 0=raw
+- [x] Implement token decoding for compressed chunks:
+  - [x] Read flag byte (8 bits → 8 tokens)
+  - [x] Flag bit=0: copy literal byte
+  - [x] Flag bit=1: decode + execute copy token (2 bytes)
+- [x] Implement copy token decoding (offset/length) based on decompressed position within chunk:
+  - [x] Calculate `bitCount` dynamically (4-12)
+  - [x] Compute `lengthBits = 16 - bitCount`
+  - [x] Compute `offset = (token >> lengthBits) + 1`
+  - [x] Compute `length = (token & ((1 << lengthBits) - 1)) + 3`
+- Result: implemented in `internal/vba/decompress.go` with tests in `internal/vba/decompress_test.go`
 
 ### 4.2 Bit count lookup table
-- [ ] Implement `bitCountForDecompressedPos(pos int) int` (or lookup table) matching the spec thresholds
+- [x] Implement `bitCountForDecompressedPos(pos int) int` (or lookup table) matching the spec thresholds
 ```
 decompressed <= 16:   bit_count = 4
 decompressed <= 32:   bit_count = 5
@@ -241,45 +250,48 @@ decompressed <= 4096: bit_count = 12
 ```
 
 ### 4.3 Unit tests for decompression
-- [ ] Add unit tests using known compressed/decompressed pairs from the MS-OVBA spec
-- [ ] Add unit tests for edge cases: empty input, single chunk, multi-chunk, uncompressed chunks
-- [ ] Add a regression test using real `Start.mdb` stream data once `MSysAccessStorage` reading exists
+- [x] Add unit tests using known compressed/decompressed pairs from the MS-OVBA spec
+- [x] Add unit tests for edge cases: empty input, single chunk, multi-chunk, uncompressed chunks
+- [x] Add a regression test using real `Start.mdb` stream data once `MSysAccessStorage` reading exists
 
 ### 4.4 Handle Access-specific compression quirks
-- [ ] Add a decompression fallback chain (standard → try skipping leading bytes → treat as raw)
-- [ ] Detect and log which fallback path was used (only when `--verbose`)
-- [ ] Add tests covering at least one “quirk” scenario once a failing sample is captured
+- [x] Add a decompression fallback chain (standard → try skipping leading bytes → treat as raw)
+- [x] Detect and log which fallback path was used (only when `--verbose`)
+- [x] Add tests covering at least one “quirk” scenario once a failing sample is captured
 
 ---
 
 ## Phase 5: VBA Source Extraction
 
+Status (27.02.2026): **Completed (core extraction layer)**
+
 ### 5.1 Extract source from module streams
-- [ ] Implement module source extraction pipeline using the `dir` mapping:
-  - [ ] Read module stream bytes from `MSysAccessStorage`
-  - [ ] Decompress module stream container
-  - [ ] Seek to `sourceOffset` (from `dir` MODULEOFFSET)
-  - [ ] Decompress the nested source container at `sourceOffset`
-  - [ ] Decode the resulting VBA text (latin-1 or project codepage)
+- [x] Implement module source extraction pipeline using the `dir` mapping:
+  - [x] Read module stream bytes from `MSysAccessStorage`
+  - [x] Decompress module stream container
+  - [x] Seek to `sourceOffset` (from `dir` MODULEOFFSET)
+  - [x] Decompress the nested source container at `sourceOffset`
+  - [x] Decode the resulting VBA text (latin-1 or project codepage)
 
 ### 5.2 Source validation and cleanup
-- [ ] Validate extracted text (e.g. must contain `Attribute VB_Name` or other known markers)
-- [ ] Strip trailing NUL bytes and other obvious padding
-- [ ] Normalize line endings (CRLF → LF)
-- [ ] Centralize decoding (latin-1 / Windows-1252 / UTF-8) behind a single helper
+- [x] Validate extracted text (e.g. must contain `Attribute VB_Name` or other known markers)
+- [x] Strip trailing NUL bytes and other obvious padding
+- [x] Normalize line endings (CRLF → LF)
+- [x] Centralize decoding (latin-1 / Windows-1252 / UTF-8) behind a single helper
 
 ### 5.3 Fallback: p-code token scanning
-- [ ] Implement “partial recovery” mode for p-code-only modules:
-  - [ ] Scan raw binary for readable VBA fragments
-  - [ ] Heuristically detect common VBA tokens (`MsgBox`, `DoCmd`, `Sub `, `Function `, ...)
-  - [ ] Emit best-effort reconstructed output
-  - [ ] Mark output as partial (e.g. header `[PARTIAL - reconstructed from p-code tokens]`)
+- [x] Implement “partial recovery” mode for p-code-only modules:
+  - [x] Scan raw binary for readable VBA fragments
+  - [x] Heuristically detect common VBA tokens (`MsgBox`, `DoCmd`, `Sub `, `Function `, ...)
+  - [x] Emit best-effort reconstructed output
+  - [x] Mark output as partial (e.g. header `[PARTIAL - reconstructed from p-code tokens]`)
 
 ### 5.4 Fallback: brute-force offset scanning
-- [ ] Implement brute-force offset scanning when `dir` mapping is unavailable:
-  - [ ] Try candidate offsets within decompressed module stream
-  - [ ] Identify likely VBA source starts (`Attribute VB_Name`, `Option Compare`, ...)
-  - [ ] Choose the best candidate via a simple scoring heuristic
+- [x] Implement brute-force offset scanning when `dir` mapping is unavailable:
+  - [x] Try candidate offsets within decompressed module stream
+  - [x] Identify likely VBA source starts (`Attribute VB_Name`, `Option Compare`, ...)
+  - [x] Choose the best candidate via a simple scoring heuristic
+- Result: implemented in `internal/vba/extract.go` with tests in `internal/vba/extract_test.go`
 
 ---
 

@@ -2,8 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	extractRecursive bool
+	extractFlat      bool
+	extractStrict    bool
+	extractDedupe    bool
 )
 
 var extractCmd = &cobra.Command{
@@ -11,11 +19,74 @@ var extractCmd = &cobra.Command{
 	Short: "Extract VBA modules from one or more Access files",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("extract not implemented yet; files=%v output-dir=%q format=%q verbose=%v\n", args, outputDir, format, verbose)
+		inputs, err := discoverInputFiles(args, extractRecursive)
+		if err != nil {
+			return err
+		}
+		if len(inputs) == 0 {
+			return fmt.Errorf("no .mdb/.accdb files found in inputs")
+		}
+
+		baseOut := defaultOutputDir()
+
+		seenHashes := map[string]string{}
+		processed := 0
+		writtenModules := 0
+		totalLines := 0
+		failed := 0
+
+		for _, file := range inputs {
+			if extractDedupe {
+				hash, hashErr := computeFileHash(file)
+				if hashErr == nil {
+					if prev, ok := seenHashes[hash]; ok {
+						if verbose {
+							fmt.Printf("skip duplicate: %s (same as %s)\n", file, prev)
+						}
+						continue
+					}
+					seenHashes[hash] = file
+				}
+			}
+
+			processed++
+			modules, loadErr := loadModules(file, verbose)
+			if loadErr != nil {
+				failed++
+				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)
+				if extractStrict {
+					return loadErr
+				}
+				continue
+			}
+
+			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat || format == "flat")
+			if writeErr != nil {
+				failed++
+				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), writeErr)
+				if extractStrict {
+					return writeErr
+				}
+				continue
+			}
+
+			writtenModules += count
+			totalLines += lines
+			fmt.Printf("%s %s -> modules=%d lines=%d\n", colorize("32", "OK"), filepath.Base(file), count, lines)
+		}
+
+		fmt.Printf("summary: processed=%d modules=%d lines=%d failed=%d output=%s\n", processed, writtenModules, totalLines, failed, baseOut)
+		if extractStrict && failed > 0 {
+			return fmt.Errorf("strict mode: %d file(s) failed", failed)
+		}
 		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(extractCmd)
+	extractCmd.Flags().BoolVar(&extractRecursive, "recursive", false, "Recursively process directories")
+	extractCmd.Flags().BoolVar(&extractFlat, "flat", false, "Write all modules into one directory")
+	extractCmd.Flags().BoolVar(&extractStrict, "strict", false, "Fail on first file error")
+	extractCmd.Flags().BoolVar(&extractDedupe, "dedupe", false, "Skip duplicate files by content hash")
 }
