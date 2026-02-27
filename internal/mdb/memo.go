@@ -12,8 +12,6 @@ const (
 	LvalMultiPage = 0x00 // data spans multiple LVAL page records
 )
 
-// LVAL page signature at offset 4: ASCII "LVAL" (0x4C56414C).
-var lvalSignature = [4]byte{'L', 'V', 'A', 'L'}
 
 // ResolveMemo resolves a MEMO/OLE field reference to its full data.
 // The raw bytes from the variable column area contain a 12-byte reference (Jet4).

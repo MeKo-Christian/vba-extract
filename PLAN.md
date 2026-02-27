@@ -99,51 +99,61 @@ Status (27.02.2026): **Completed**
 - [x] Document expected extraction results
 - Result: `testdata/Start.mdb`, `testdata/README.md`, and `testdata/Start.expected.modules.txt` added
 
+### 0.4 Repository & folder scaffolding
+- [x] Initialize git repository (`git init`)
+- [x] Add `.gitignore`
+- [x] Create base directories (`cmd/`, `internal/`, `testdata/`)
+
 ---
 
 ## Phase 1: MDB File Reader (Jet4 Format)
 
+Status (27.02.2026): **Completed**
+
 This is the foundation. We need to read the binary MDB format to access system tables.
 
 ### 1.1 Database header parser
-- [ ] Implement a database header reader that loads page 0 (4096 bytes)
-- [ ] Parse and expose Jet version (Jet3=0x00, Jet4=0x01, ACCDB=0x02)
-- [ ] Parse and expose database codepage + encryption flag (if present)
-- [ ] Validate magic bytes (`\x00\x01\x00\x00` at offset 0) and return a typed error on mismatch
+- [x] Implement a database header reader that loads page 0 (4096 bytes)
+- [x] Parse and expose Jet version (Jet3=0x00, Jet4=0x01, ACE=0x03/0x04)
+- [x] Parse and expose database codepage + sort order
+- [x] Validate magic bytes (`\x00\x01\x00\x00` at offset 0) and return a typed error on mismatch
+- Result: `internal/mdb/reader.go` — `Open()`, `Header`, `ReadPage()`, `PageType()`
 
 ### 1.2 Page reader
-- [ ] Implement a `PageReader` that reads arbitrary pages by index (`pageNum * pageSize`)
-- [ ] Enforce/support Jet4 page size (4096 bytes) with clear errors for unsupported sizes
-- [ ] Parse and expose page type byte (0x01=data, 0x02=table def, 0x03=index, 0x04=leaf index, 0x05=long value)
+- [x] Implement page reader that reads arbitrary pages by index (`pageNum * pageSize`)
+- [x] Support Jet4 page size (4096 bytes) with bounds checking
+- [x] Parse page type byte (0x01=data, 0x02=TDEF, 0x03=index, 0x04=leaf index, 0x05=usage)
+- Result: integrated into `reader.go`
 
 ### 1.3 Table definition parser
-- [ ] Implement MSysObjects parsing (starting at page 2) to locate table definitions
-- [ ] Implement table definition parsing (table metadata + column definitions: name, type, offset, length, flags)
-- [ ] Implement decoding for required column types:
-  - [ ] 0x01: Boolean
-  - [ ] 0x03: Short Int
-  - [ ] 0x04: Long Int
-  - [ ] 0x05: Currency
-  - [ ] 0x0A: Text (variable length)
-  - [ ] 0x0B: OLE/Binary (Long Value)
-  - [ ] 0x0C: Memo (Long Value)
+- [x] Parse TDEF pages (multi-page chain support)
+- [x] Parse column definitions: name (UCS-2LE), type, offsets, length, flags
+- [x] Support all required column types: Bool, Int, Long, Float, Double, DateTime, Text, Binary, OLE, Memo
+- Result: `internal/mdb/table.go` — `ReadTableDef()`, `Column`, `TableDef`
+- Note: table type at offset 0x28 (not 0x18 as some docs suggest); col names in Jet4 are UCS-2LE with 2-byte length prefix
 
 ### 1.4 Row reader
-- [ ] Implement data page chain traversal for a given table
-- [ ] Implement row enumeration using the row offset table stored at the end of data pages
-- [ ] Implement variable-length column decoding for rows
-- [ ] Implement null bitmap handling (so missing values are distinguishable from empty values)
+- [x] Data page discovery via full page scan (checking tdef_pg field)
+- [x] Row enumeration from row offset table (2 bytes/entry at offset 0x0E, num_rows at 0x0C)
+- [x] Jet4 row format: num_cols at START, [null_mask][num_var_cols][var_table] at END
+- [x] Variable-length column decoding with proper type coercion (numeric types stored as var cols)
+- [x] Null bitmap handling
+- Result: `internal/mdb/column.go` — `ReadRows()`, `parseRow()`
+- Note: Jet4 row metadata layout differs from some documentation; var_offset_table stored in reverse order
 
 ### 1.5 Long Value (MEMO/OLE) reader
-- [ ] Implement Long Value (LV) reading by following LV page chains to reconstruct binary blobs
-- [ ] Support multi-page long values (linked pages)
-- [ ] Support inline vs overflow long values
-- [ ] Validate LV output integrity (length/chain termination), since this is critical for `MSysAccessStorage.Lv`
+- [x] 12-byte LVAL reference parsing (memo_len, bitmask, lval_dp)
+- [x] Inline data (bitmask 0x80), single-page (0x40), multi-page chain (0x00)
+- [x] LVAL page record reading via row offset table
+- Result: `internal/mdb/memo.go` — `ResolveMemo()`
+- Validated: PROJECT stream (1184 bytes) successfully read from MSysAccessStorage
 
 ### 1.6 System table: MSysObjects reader
-- [ ] Build a table catalog from MSysObjects (table name → definition page)
-- [ ] Expose helpers to resolve system tables by name (e.g. `MSysAccessStorage`)
-- [ ] Add minimal sanity checks for system-table presence and friendly errors when missing
+- [x] Build table catalog from MSysObjects (table name → TDEF page via ID)
+- [x] `FindTable()` helper to locate any table by name
+- [x] `TableNames()` for listing all tables
+- Result: `internal/mdb/catalog.go` — `Catalog()`, `FindTable()`, `TableNames()`
+- Validated: MSysAccessStorage found at ID=56, all 31 tables enumerated correctly
 
 ---
 

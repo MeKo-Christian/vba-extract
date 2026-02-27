@@ -263,6 +263,36 @@ func readVarColumn(data []byte, col *Column, varOffsets []int, numVarCols int) i
 	switch col.Type {
 	case ColTypeText:
 		return decodeUCS2(raw)
+	case ColTypeBool:
+		if len(raw) >= 1 {
+			return raw[0] != 0
+		}
+		return nil
+	case ColTypeByte:
+		if len(raw) >= 1 {
+			return raw[0]
+		}
+		return nil
+	case ColTypeInt:
+		if len(raw) >= 2 {
+			return int16(binary.LittleEndian.Uint16(raw))
+		}
+		return nil
+	case ColTypeLong:
+		if len(raw) >= 4 {
+			return int32(binary.LittleEndian.Uint32(raw))
+		}
+		return nil
+	case ColTypeFloat:
+		if len(raw) >= 4 {
+			return math.Float32frombits(binary.LittleEndian.Uint32(raw))
+		}
+		return nil
+	case ColTypeDouble, ColTypeDatetime, ColTypeMoney:
+		if len(raw) >= 8 {
+			return math.Float64frombits(binary.LittleEndian.Uint64(raw))
+		}
+		return nil
 	case ColTypeMemo, ColTypeOLE:
 		result := make([]byte, len(raw))
 		copy(result, raw)
