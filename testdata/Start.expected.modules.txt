@@ -1,0 +1,21 @@
+# Expected module names for Start.mdb (15 modules)
+# Source: PROJECT stream (Id=4847) in MSysAccessStorage
+
+# Standard modules (.bas)
+Inidatei
+Menueaufbau
+Modul1
+SQL
+IPAdresse2
+mod_api_Functions
+Update
+Verweise
+ModAutostart
+
+# DocClass modules (.cls) — forms
+Form_Module
+Form_Module_Übersicht
+Form_Übersicht
+Form_Verweise
+Form_Startschirm
+Form_Mitteilung
