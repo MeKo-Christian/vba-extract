@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"golang.org/x/text/encoding/charmap"
 )
 
 var ErrDirNeedsDecompression = errors.New("vba: dir stream appears compressed and needs decompression")
@@ -143,9 +145,17 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 	return result, nil
 }
 
+// trimText decodes a byte slice as Windows-1252/Latin-1 and strips null
+// bytes and surrounding whitespace. Module names in the dir stream are MBCS
+// (Windows codepage), which for Western European characters is Windows-1252.
+// Using raw string(b) would corrupt non-ASCII bytes like Ü (0xDC) since Go
+// strings are UTF-8, causing name mismatches with the PROJECT stream.
 func trimText(b []byte) string {
-	text := string(b)
-	text = strings.TrimRight(text, "\x00")
+	decoded, err := charmap.ISO8859_1.NewDecoder().Bytes(b)
+	if err != nil {
+		decoded = b
+	}
+	text := strings.TrimRight(string(decoded), "\x00")
 	return strings.TrimSpace(text)
 }
 

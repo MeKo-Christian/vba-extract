@@ -202,19 +202,17 @@ func TestDirStreamRegressionFromStartMDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseDirRecords: %v", err)
 	}
-	if len(info.Modules) == 0 {
-		t.Fatal("no modules parsed from decompressed dir stream")
+	if len(info.Modules) != 15 {
+		t.Errorf("modules = %d, want 15", len(info.Modules))
 	}
 
-	foundUseful := false
 	for _, module := range info.Modules {
-		if strings.TrimSpace(module.ModuleName) != "" || strings.TrimSpace(module.StreamName) != "" || module.SourceOff > 0 {
-			foundUseful = true
-			break
+		if strings.TrimSpace(module.ModuleName) == "" {
+			t.Errorf("module with empty name: %+v", module)
 		}
-	}
-	if !foundUseful {
-		t.Fatal("dir stream parsed, but no useful module fields found")
+		if strings.TrimSpace(module.StreamName) == "" {
+			t.Errorf("module %q has empty StreamName", module.ModuleName)
+		}
 	}
 }
 

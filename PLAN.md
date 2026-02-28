@@ -297,71 +297,82 @@ Status (27.02.2026): **Completed (core extraction layer)**
 
 ## Phase 6: CLI & Output
 
+Status (27.02.2026): **Completed (core CLI implementation)**
+
 ### 6.1 `extract` command implementation
-- [ ] Wire `extract` command to the extraction pipeline
-- [ ] Accept one or more MDB file paths (and optionally globs)
-- [ ] Implement `--output-dir` (default: `./vba-output/<db-name>/`)
-- [ ] Implement `--flat` output mode (otherwise: one subdirectory per MDB)
-- [ ] Write each module as `<moduleName>.bas` or `<moduleName>.cls`
-- [ ] Print a summary (modules extracted, LoC, failures)
+- [x] Wire `extract` command to the extraction pipeline
+- [x] Accept one or more MDB file paths (and optionally globs)
+- [x] Implement `--output-dir` (default: `./vba-output/<db-name>/`)
+- [x] Implement `--flat` output mode (otherwise: one subdirectory per MDB)
+- [x] Write each module as `<moduleName>.bas` or `<moduleName>.cls`
+- [x] Print a summary (modules extracted, LoC, failures)
 
 ### 6.2 `list` command implementation
-- [ ] Wire `list` command to parse PROJECT/dir and show module names/types/sizes
-- [ ] Render output as a readable table by default
-- [ ] Add `--json` output mode for machine-readable results
+- [x] Wire `list` command to parse PROJECT/dir and show module names/types/sizes
+- [x] Render output as a readable table by default
+- [x] Add `--json` output mode for machine-readable results
 
 ### 6.3 `info` command implementation
-- [ ] Wire `info` command to MDB header + catalog parsing
-- [ ] Print MDB metadata (version, codepage, table count)
-- [ ] Print VBA project summary (name, module count)
-- [ ] Optionally print a trimmed storage tree view (ROOT → VBAProject → VBA)
+- [x] Wire `info` command to MDB header + catalog parsing
+- [x] Print MDB metadata (version, codepage, table count)
+- [x] Print VBA project summary (name, module count)
+- [x] Optionally print a trimmed storage tree view (ROOT → VBAProject → VBA)
 
 ### 6.4 Batch mode
-- [ ] Implement `--recursive` directory traversal mode
-- [ ] Detect and process `.mdb` and `.accdb` files
-- [ ] Add optional duplicate skipping via content hash
-- [ ] Print aggregated summary at end (processed/extracted/failed)
+- [x] Implement `--recursive` directory traversal mode
+- [x] Detect and process `.mdb` and `.accdb` files
+- [x] Add optional duplicate skipping via content hash
+- [x] Print aggregated summary at end (processed/extracted/failed)
 
 ### 6.5 Error handling and reporting
-- [ ] Implement per-file error reporting (continue on errors by default)
-- [ ] Add `--strict` mode to fail-fast / return non-zero when any file fails
-- [ ] Use `--verbose` to enable progress + debug logging
-- [ ] Implement color-coded terminal output when running on a TTY (auto-disable when output is piped)
+- [x] Implement per-file error reporting (continue on errors by default)
+- [x] Add `--strict` mode to fail-fast / return non-zero when any file fails
+- [x] Use `--verbose` to enable progress + debug logging
+- [x] Implement color-coded terminal output when running on a TTY (auto-disable when output is piped)
+- Result: implemented in `cmd/extract.go`, `cmd/list.go`, `cmd/info.go`, and `cmd/common.go`
 
 ---
 
 ## Phase 7: Testing & Validation
 
+Status (27.02.2026): **Completed (automated coverage + procedure doc)**
+
 ### 7.1 Unit tests
-- [ ] Add unit tests for MDB page reader using synthetic fixtures
-- [ ] Add unit tests for column parsing/decoding (all supported types)
-- [ ] Add unit tests for MS-OVBA decompression (spec examples + regression samples)
-- [ ] Add unit tests for `dir` stream parsing with known module mappings
-- [ ] Add unit tests for `PROJECT` parsing with known module lists
+- [x] Add unit tests for MDB page reader using synthetic fixtures
+- [x] Add unit tests for column parsing/decoding (all supported types)
+- [x] Add unit tests for MS-OVBA decompression (spec examples + regression samples)
+- [x] Add unit tests for `dir` stream parsing with known module mappings
+- [x] Add unit tests for `PROJECT` parsing with known module lists
 
 ### 7.2 Integration tests
-- [ ] Add an integration test that runs extraction against `testdata/Start.mdb`
-- [ ] Assert module list contains baseline modules from `testdata/Start.expected.modules.txt`
-- [ ] Assert at least one extracted file contains `Attribute VB_Name`
-- [ ] Add optional integration tests for `AT990426.mdb` and `PPS.mdb` (skipped when fixtures are absent)
+- [x] Add an integration test that runs extraction against `testdata/Start.mdb`
+- [x] Assert module list contains baseline modules from `testdata/Start.expected.modules.txt`
+- [x] Assert at least one extracted file contains `Attribute VB_Name`
+- [x] Add optional integration tests for `AT990426.mdb` and `PPS.mdb` (skipped when fixtures are absent)
 
 ### 7.3 Cross-validation
-- [ ] Create a cross-validation procedure doc (Windows extraction + comparison steps)
-- [ ] Compare extracted module counts and spot-check content/line counts
+- [x] Create a cross-validation procedure doc (Windows extraction + comparison steps)
+- [x] Compare extracted module counts and spot-check content/line counts
+- Result: coverage in `internal/vba/*_test.go` and procedure in `docs/cross-validation.md`
 
 ---
 
 ## Phase 8: IPOffice Batch Extraction
 
+Status (27.02.2026): **Completed**
+
 ### 8.1 Run extraction on all IPOffice MDB files
-- [ ] Run extraction over all 23 unique MDB files from `~/Code/MeKo/IPOffice-VBA/mdb-files/`
-- [ ] Write outputs to `~/Code/MeKo/IPOffice-VBA/extracted/`
-- [ ] Generate a summary report (per-DB module count + failures)
+- [x] Run extraction over all 23 unique MDB files from `~/Code/MeKo/IPOffice-VBA/mdb-files/`
+- [x] Write outputs to `~/Code/MeKo/IPOffice-VBA/extracted/`
+- [x] Generate a summary report (per-DB module count + failures)
+- Result: processed=23, success=19, failed=4, modules=1895, lines=370872 (rerun 2026-02-28)
+- Reports: `docs/reports/2026-02-27-phase8-1-batch-summary.md`, `docs/reports/2026-02-28-phase8-rerun-summary.md`
 
 ### 8.2 Organize extracted VBA
-- [ ] Ensure output is organized as one directory per database
-- [ ] Generate a README per database listing modules + brief notes (if derivable)
-- [ ] Generate a top-level index file listing all databases and module counts
+- [x] Ensure output is organized as one directory per database
+- [x] Generate a README per database listing modules + brief notes (if derivable)
+- [x] Generate a top-level index file listing all databases and module counts
+- Result: per-database `README.md` files and top-level `INDEX.md` generated in extraction output
 
 ---
 

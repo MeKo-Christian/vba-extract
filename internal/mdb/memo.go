@@ -126,6 +126,16 @@ func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte
 	return result, nil
 }
 
+// ReadLvalChain reads an LVAL multi-page chain starting at the given page and row.
+// maxLen caps the amount of data returned; pass 0 for no limit.
+func (db *Database) ReadLvalChain(pageNum int64, rowID int, maxLen int) ([]byte, error) {
+	effective := maxLen
+	if effective <= 0 {
+		effective = 1<<31 - 1 // 2GB cap
+	}
+	return db.readLvalChain(pageNum, rowID, effective)
+}
+
 // readLvalChain reads a multi-page LVAL chain.
 func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byte, error) {
 	var result []byte
@@ -161,13 +171,16 @@ func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byt
 
 		recordData := page[offset:rowEnd]
 
-		// Type 2 records: first 4 bytes = next page, next 2 bytes = next row.
-		if len(recordData) < 6 {
+		// The first 4 bytes encode the next record pointer using the same
+		// format as the initial LVAL reference: (pageNum << 8) | rowID.
+		// Zero means end of chain.
+		if len(recordData) < 4 {
 			break
 		}
-		nextPage := int64(binary.LittleEndian.Uint32(recordData[0:4]))
-		nextRow := int(binary.LittleEndian.Uint16(recordData[4:6]))
-		chunk := recordData[6:]
+		nextPtr := binary.LittleEndian.Uint32(recordData[0:4])
+		nextPage := int64(nextPtr >> 8)
+		nextRow := int(nextPtr & 0xFF)
+		chunk := recordData[4:]
 
 		result = append(result, chunk...)
 

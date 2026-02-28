@@ -119,10 +119,7 @@ func loadModules(path string, verbose bool) ([]vba.ExtractedModule, error) {
 	}
 	defer db.Close()
 
-	st, err := vba.LoadStorageTree(db)
-	if err != nil {
-		return nil, fmt.Errorf("load storage tree %q: %w", path, err)
-	}
+	st, stErr := vba.LoadStorageTree(db)
 
 	logger := func(format string, args ...interface{}) {
 		if verbose {
@@ -130,11 +127,31 @@ func loadModules(path string, verbose bool) ([]vba.ExtractedModule, error) {
 		}
 	}
 
-	modules, err := vba.ExtractAllModules(st, verbose, logger)
-	if err != nil {
-		return nil, fmt.Errorf("extract modules %q: %w", path, err)
+	var modules []vba.ExtractedModule
+	var extractErr error
+	if stErr == nil {
+		modules, extractErr = vba.ExtractAllModules(st, verbose, logger)
+		if extractErr == nil && len(modules) > 0 {
+			return modules, nil
+		}
+	} else {
+		extractErr = stErr
 	}
 
+	// Fallback: scan raw LVAL chains for orphaned module streams.
+	// This handles databases where MSysAccessStorage is missing entirely or
+	// where the VBA structure was stripped from it but page data remains on disk.
+	scanned, scanErr := vba.ScanOrphanedLvalModules(db)
+	if scanErr == nil && len(scanned) > 0 {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "vba: standard extraction failed (%v); recovered %d modules via raw LVAL scan\n", extractErr, len(scanned))
+		}
+		return scanned, nil
+	}
+
+	if extractErr != nil {
+		return nil, fmt.Errorf("extract modules %q: %w", path, extractErr)
+	}
 	return modules, nil
 }
 

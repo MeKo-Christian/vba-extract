@@ -169,7 +169,71 @@ func TestParseProjectFromStartMDB(t *testing.T) {
 		t.Fatalf("ParseProjectStream: %v", err)
 	}
 
-	if len(info.Modules) == 0 {
-		t.Fatal("no modules parsed from PROJECT stream")
+	if len(info.Modules) != 15 {
+		t.Errorf("modules = %d, want 15", len(info.Modules))
+	}
+
+	docClasses, standards := 0, 0
+	for _, m := range info.Modules {
+		switch m.Type {
+		case ProjectModuleDocument:
+			docClasses++
+		case ProjectModuleStandard:
+			standards++
+		}
+	}
+	if docClasses != 6 {
+		t.Errorf("DocClass modules = %d, want 6", docClasses)
+	}
+	if standards != 9 {
+		t.Errorf("Standard modules = %d, want 9", standards)
+	}
+	if info.Name != "Start" {
+		t.Errorf("project name = %q, want %q", info.Name, "Start")
+	}
+}
+
+func TestBuildModuleMappingsStartMDB(t *testing.T) {
+	db := testDB(t)
+	st, err := LoadStorageTree(db)
+	if err != nil {
+		t.Fatalf("LoadStorageTree: %v", err)
+	}
+
+	required, err := st.RequiredStreams()
+	if err != nil {
+		t.Fatalf("RequiredStreams: %v", err)
+	}
+	moduleStreams, err := st.ModuleStreams()
+	if err != nil {
+		t.Fatalf("ModuleStreams: %v", err)
+	}
+
+	projectInfo, err := ParseProjectStream(required["PROJECT"].Data)
+	if err != nil {
+		t.Fatalf("ParseProjectStream: %v", err)
+	}
+
+	dirInfo, err := ParseDirStream(required["dir"].Data, DecompressContainer)
+	if err != nil {
+		t.Fatalf("ParseDirStream: %v", err)
+	}
+
+	mappings, warns := BuildModuleMappings(projectInfo, dirInfo, moduleStreams)
+	for _, w := range warns {
+		t.Logf("warn: %s", w)
+	}
+
+	if len(mappings) != 15 {
+		t.Errorf("mappings = %d, want 15", len(mappings))
+	}
+
+	for _, m := range mappings {
+		if m.StreamName == "" {
+			t.Errorf("module %q has empty StreamName", m.ModuleName)
+		}
+		if m.SourceOffset == 0 {
+			t.Logf("module %q has sourceOffset=0 (may be valid)", m.ModuleName)
+		}
 	}
 }

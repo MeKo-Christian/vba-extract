@@ -1,6 +1,7 @@
 package vba
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -53,6 +54,10 @@ func LoadStorageTree(db *mdb.Database) (*StorageTree, error) {
 		}
 		if node == nil {
 			continue
+		}
+
+		if node.ParentID == node.ID {
+			node.ParentID = 0
 		}
 
 		st.Nodes = append(st.Nodes, node)
@@ -274,22 +279,43 @@ func (st *StorageTree) VBAFolderNode() (*StorageNode, error) {
 // RequiredStreams returns required stream nodes under VBA folder.
 // Keys: PROJECT, PROJECTwm, dir, _VBA_PROJECT.
 func (st *StorageTree) RequiredStreams() (map[string]*StorageNode, error) {
-	vbaProject, err := st.VBAProjectNode()
-	if err != nil {
-		return nil, err
-	}
-
 	requiredNames := []string{"PROJECT", "PROJECTwm", "dir", "_VBA_PROJECT"}
 	result := make(map[string]*StorageNode, len(requiredNames))
-	subtree := st.subtree(vbaProject.ID)
 
-	for _, name := range requiredNames {
-		for _, node := range subtree {
-			if strings.EqualFold(node.Name, name) {
-				result[name] = node
-				break
+	if vbaProject, err := st.VBAProjectNode(); err == nil {
+		subtree := st.subtree(vbaProject.ID)
+		for _, name := range requiredNames {
+			for _, node := range subtree {
+				if strings.EqualFold(node.Name, name) {
+					result[name] = node
+					break
+				}
 			}
 		}
+	}
+
+	for _, name := range requiredNames {
+		if result[name] != nil {
+			continue
+		}
+		if node := st.findByNameGlobal(name); node != nil {
+			result[name] = node
+		}
+	}
+
+	if result["PROJECT"] == nil {
+		if node := st.findLikelyProjectNode(); node != nil {
+			result["PROJECT"] = node
+		}
+	}
+	if result["dir"] == nil {
+		if node := st.findLikelyDirNode(); node != nil {
+			result["dir"] = node
+		}
+	}
+
+	if result["PROJECT"] == nil {
+		return result, fmt.Errorf("vba: PROJECT stream not found")
 	}
 
 	return result, nil
@@ -297,11 +323,20 @@ func (st *StorageTree) RequiredStreams() (map[string]*StorageNode, error) {
 
 func (st *StorageTree) subtree(parentID int32) []*StorageNode {
 	var out []*StorageNode
+	visited := map[int32]bool{}
 	var walk func(int32)
 
 	walk = func(pid int32) {
+		if visited[pid] {
+			return
+		}
+		visited[pid] = true
+
 		children := st.Children[pid]
 		for _, child := range children {
+			if child.ID == pid {
+				continue
+			}
 			out = append(out, child)
 			walk(child.ID)
 		}
@@ -314,23 +349,51 @@ func (st *StorageTree) subtree(parentID int32) []*StorageNode {
 // ModuleStreams returns all child streams under VBA folder excluding required streams.
 func (st *StorageTree) ModuleStreams() ([]*StorageNode, error) {
 	vbaFolder, err := st.VBAFolderNode()
-	if err != nil {
-		return nil, err
+	if err == nil {
+		required := map[string]struct{}{
+			"PROJECT":      {},
+			"PROJECTwm":    {},
+			"dir":          {},
+			"_VBA_PROJECT": {},
+		}
+
+		var modules []*StorageNode
+		for _, node := range st.Children[vbaFolder.ID] {
+			if _, isRequired := required[node.Name]; isRequired {
+				continue
+			}
+			modules = append(modules, node)
+		}
+
+		sort.Slice(modules, func(i, j int) bool {
+			if modules[i].ID == modules[j].ID {
+				return modules[i].Name < modules[j].Name
+			}
+			return modules[i].ID < modules[j].ID
+		})
+
+		if len(modules) > 0 {
+			return modules, nil
+		}
 	}
 
-	required := map[string]struct{}{
-		"PROJECT":      {},
-		"PROJECTwm":    {},
-		"dir":          {},
-		"_VBA_PROJECT": {},
+	required, _ := st.RequiredStreams()
+	reservedNames := map[string]struct{}{}
+	for name := range required {
+		reservedNames[strings.ToLower(name)] = struct{}{}
 	}
 
 	var modules []*StorageNode
-	for _, node := range st.Children[vbaFolder.ID] {
-		if _, isRequired := required[node.Name]; isRequired {
+	for _, node := range st.Nodes {
+		if node == nil || len(node.Data) == 0 {
 			continue
 		}
-		modules = append(modules, node)
+		if _, isReserved := reservedNames[strings.ToLower(node.Name)]; isReserved {
+			continue
+		}
+		if node.Type == 2 || isLikelyModuleStreamName(node.Name) {
+			modules = append(modules, node)
+		}
 	}
 
 	sort.Slice(modules, func(i, j int) bool {
@@ -340,5 +403,75 @@ func (st *StorageTree) ModuleStreams() ([]*StorageNode, error) {
 		return modules[i].ID < modules[j].ID
 	})
 
+	if len(modules) == 0 {
+		return nil, fmt.Errorf("vba: no module streams found")
+	}
+
 	return modules, nil
+}
+
+func (st *StorageTree) findByNameGlobal(name string) *StorageNode {
+	var best *StorageNode
+	for _, node := range st.Nodes {
+		if !strings.EqualFold(node.Name, name) {
+			continue
+		}
+		if best == nil {
+			best = node
+			continue
+		}
+		if len(node.Data) > len(best.Data) {
+			best = node
+		}
+	}
+	return best
+}
+
+func (st *StorageTree) findLikelyProjectNode() *StorageNode {
+	for _, node := range st.Nodes {
+		if len(node.Data) == 0 {
+			continue
+		}
+		data := node.Data
+		if bytes.Contains(data, []byte("Module=")) || bytes.Contains(data, []byte("DocClass=")) || bytes.Contains(data, []byte("Class=")) {
+			if _, err := ParseProjectStream(data); err == nil {
+				return node
+			}
+		}
+	}
+	return nil
+}
+
+func (st *StorageTree) findLikelyDirNode() *StorageNode {
+	for _, node := range st.Nodes {
+		if len(node.Data) == 0 {
+			continue
+		}
+		if _, err := ParseDirStream(node.Data, func(in []byte) ([]byte, error) {
+			out, _, derr := DecompressContainerWithFallback(in, false, nil)
+			return out, derr
+		}); err == nil {
+			return node
+		}
+	}
+	return nil
+}
+
+func isLikelyModuleStreamName(name string) bool {
+	if name == "" {
+		return false
+	}
+	upper := strings.ToUpper(name)
+	if strings.Contains(upper, "VBA") || strings.Contains(upper, "PROJECT") {
+		return false
+	}
+	if len(upper) < 12 {
+		return false
+	}
+	for _, r := range upper {
+		if (r < 'A' || r > 'Z') && r != '_' {
+			return false
+		}
+	}
+	return true
 }

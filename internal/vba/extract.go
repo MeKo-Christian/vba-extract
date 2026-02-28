@@ -89,42 +89,37 @@ func extractModuleSource(mapping ModuleMapping, verbose bool, logf func(string, 
 
 	var warnings []string
 
-	streamDecompressed, strategy, err := DecompressContainerWithFallback(mapping.Data, verbose, logf)
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("stream decompression failed: %v", err))
+	// Module stream layout (MS-OVBA §2.3.4.3):
+	//   bytes [0 .. SourceOffset-1] = compiled p-code (binary, not OVBA)
+	//   bytes [SourceOffset ..]     = OVBA compressed VBA source
+	// SourceOffset is in the RAW bytes — do NOT decompress the whole stream first.
+	offset := int(mapping.SourceOffset)
+	if offset > len(mapping.Data) {
+		warnings = append(warnings, fmt.Sprintf("sourceOffset %d exceeds stream length %d; trying brute-force scan", offset, len(mapping.Data)))
+		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
+			return cleanupVBA(text), warnings, false
+		}
 		return recoverPartialFromRaw(mapping.Data, warnings)
 	}
-	if strategy != StrategyStandard {
-		warnings = append(warnings, fmt.Sprintf("stream decompression used strategy %s", strategy))
-	}
 
-	offset := int(mapping.SourceOffset)
-	if offset < 0 || offset >= len(streamDecompressed) {
-		warnings = append(warnings, fmt.Sprintf("sourceOffset %d out of range; trying fallback scan", mapping.SourceOffset))
-		if text, ok := bruteForceOffsetScan(streamDecompressed); ok {
-			return cleanupVBA(text), warnings, false
-		}
-		return recoverPartialFromRaw(streamDecompressed, warnings)
-	}
-
-	sourceCandidate := streamDecompressed[offset:]
+	sourceCandidate := mapping.Data[offset:]
 	finalRaw, srcStrategy, srcErr := DecompressContainerWithFallback(sourceCandidate, verbose, logf)
 	if srcErr != nil {
-		warnings = append(warnings, fmt.Sprintf("nested source decompression failed at offset %d: %v", offset, srcErr))
-		if text, ok := bruteForceOffsetScan(streamDecompressed); ok {
+		warnings = append(warnings, fmt.Sprintf("source decompression failed at offset %d: %v; trying brute-force scan", offset, srcErr))
+		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
 			return cleanupVBA(text), warnings, false
 		}
-		return recoverPartialFromRaw(sourceCandidate, warnings)
+		return recoverPartialFromRaw(mapping.Data, warnings)
 	}
 	if srcStrategy != StrategyStandard {
-		warnings = append(warnings, fmt.Sprintf("nested source decompression used strategy %s", srcStrategy))
+		warnings = append(warnings, fmt.Sprintf("source decompression used strategy %s", srcStrategy))
 	}
 
 	decoded := decodeBestText(finalRaw)
 	decoded = cleanupVBA(decoded)
 	if !looksLikeVBASource(decoded) {
 		warnings = append(warnings, "decoded source does not contain strong VBA markers")
-		if text, ok := bruteForceOffsetScan(streamDecompressed); ok {
+		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
 			return cleanupVBA(text), warnings, false
 		}
 		if partial, pOK := recoverPartialText(finalRaw); pOK {

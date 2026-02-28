@@ -10,6 +10,7 @@ import (
 )
 
 var infoShowTree bool
+var infoForensic bool
 
 var infoCmd = &cobra.Command{
 	Use:   "info [file]",
@@ -56,6 +57,10 @@ var infoCmd = &cobra.Command{
 			printStorageTree(st)
 		}
 
+		if infoForensic {
+			printForensic(st)
+		}
+
 		return nil
 	},
 }
@@ -63,6 +68,7 @@ var infoCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(infoCmd)
 	infoCmd.Flags().BoolVar(&infoShowTree, "tree", false, "Show storage tree")
+	infoCmd.Flags().BoolVar(&infoForensic, "forensic", false, "Scan all storage streams for hidden/non-standard VBA candidates")
 }
 
 func printStorageTree(st *vba.StorageTree) {
@@ -73,17 +79,65 @@ func printStorageTree(st *vba.StorageTree) {
 	}
 
 	fmt.Println("storageTree:")
+	visited := map[int32]bool{}
 	var walk func(node *vba.StorageNode, depth int)
 	walk = func(node *vba.StorageNode, depth int) {
+		if node == nil {
+			return
+		}
+		if depth > 20 {
+			indent := ""
+			for i := 0; i < depth; i++ {
+				indent += "  "
+			}
+			fmt.Printf("%s- ... (depth limit reached)\n", indent)
+			return
+		}
+		if visited[node.ID] {
+			indent := ""
+			for i := 0; i < depth; i++ {
+				indent += "  "
+			}
+			fmt.Printf("%s- %s (id=%d) [cycle]\n", indent, node.Name, node.ID)
+			return
+		}
+		visited[node.ID] = true
+
 		indent := ""
 		for i := 0; i < depth; i++ {
 			indent += "  "
 		}
 		fmt.Printf("%s- %s (id=%d type=%d data=%d)\n", indent, node.Name, node.ID, node.Type, len(node.Data))
 		for _, child := range st.Children[node.ID] {
+			if child != nil && child.ID == node.ID {
+				continue
+			}
 			walk(child, depth+1)
 		}
+		visited[node.ID] = false
 	}
 
 	walk(root, 0)
+}
+
+func printForensic(st *vba.StorageTree) {
+	report := vba.ForensicScanStorage(st)
+	fmt.Println("forensic:")
+	fmt.Printf("  hits=%d projectCandidates=%d dirCandidates=%d sourceCandidates=%d compressedCandidates=%d artifactCandidates=%d\n",
+		len(report.Hits), report.ProjectCandidates, report.DirCandidates, report.SourceCandidates, report.CompressedCandidates, report.ArtifactCandidates)
+
+	limit := len(report.Hits)
+	if limit > 25 {
+		limit = 25
+	}
+
+	for i := 0; i < limit; i++ {
+		h := report.Hits[i]
+		fmt.Printf("  - id=%d name=%q type=%d size=%d kind=%s score=%d :: %s\n",
+			h.NodeID, h.NodeName, h.NodeType, h.DataSize, h.Kind, h.Score, h.Summary)
+	}
+
+	if len(report.Hits) > limit {
+		fmt.Printf("  ... %d more hit(s)\n", len(report.Hits)-limit)
+	}
 }
