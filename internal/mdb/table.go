@@ -106,6 +106,10 @@ type TableDef struct {
 
 // ReadTableDef reads and parses a table definition from the given TDEF page.
 func (db *Database) ReadTableDef(tdefPage int64) (*TableDef, error) {
+	if !db.IsJet4() {
+		return nil, ErrJet3TableLayoutUnsupported
+	}
+
 	// Read the full TDEF, which may span multiple pages.
 	tdefData, err := db.readTDEFPages(tdefPage)
 	if err != nil {

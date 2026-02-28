@@ -3,13 +3,17 @@ package mdb
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 )
 
 const (
-	PageSize = 4096
+	MinPageSize  = 2048
+	PageSizeJet4 = 4096
+	PageSizeJet3 = 2048
+	PageSize     = PageSizeJet4
 
 	// JetVersion3 and related constants are Jet version values at offset 0x14 (little-endian uint32).
 	JetVersion3    = 0x00 // Access 97
@@ -39,6 +43,8 @@ const (
 
 var magicBytes = [4]byte{0x00, 0x01, 0x00, 0x00}
 
+var ErrJet3TableLayoutUnsupported = errors.New("mdb: Jet 3.5 table layout parsing is not implemented")
+
 // Header holds parsed database header fields from page 0.
 type Header struct {
 	JetVersion uint32
@@ -52,6 +58,7 @@ type Header struct {
 type Database struct {
 	f         *os.File
 	Header    Header
+	pageSize  int64
 	pageCount int64
 }
 
@@ -68,14 +75,14 @@ func Open(path string) (*Database, error) {
 		return nil, fmt.Errorf("mdb: stat: %w", err)
 	}
 
-	if fi.Size() < PageSize {
+	if fi.Size() < MinPageSize {
 		f.Close()
 		return nil, fmt.Errorf("mdb: file too small (%d bytes)", fi.Size())
 	}
 
 	db := &Database{
-		f:         f,
-		pageCount: fi.Size() / PageSize,
+		f:        f,
+		pageSize: PageSizeJet4,
 	}
 
 	err = db.parseHeader()
@@ -83,6 +90,14 @@ func Open(path string) (*Database, error) {
 		f.Close()
 		return nil, err
 	}
+
+	db.pageSize = int64(pageSizeForJetVersion(db.Header.JetVersion))
+	if fi.Size() < db.pageSize {
+		f.Close()
+		return nil, fmt.Errorf("mdb: file too small for page size %d (%d bytes)", db.pageSize, fi.Size())
+	}
+
+	db.pageCount = fi.Size() / db.pageSize
 
 	return db, nil
 }
@@ -97,6 +112,11 @@ func (db *Database) PageCount() int64 {
 	return db.pageCount
 }
 
+// PageSize returns the database page size in bytes.
+func (db *Database) PageSize() int64 {
+	return db.pageSize
+}
+
 // IsJet4 returns true if the database uses Jet4 or later format.
 func (db *Database) IsJet4() bool {
 	return db.Header.JetVersion >= JetVersion4
@@ -108,9 +128,9 @@ func (db *Database) ReadPage(pageNum int64) ([]byte, error) {
 		return nil, fmt.Errorf("mdb: page %d out of range (0..%d)", pageNum, db.pageCount-1)
 	}
 
-	page := make([]byte, PageSize)
+	page := make([]byte, db.pageSize)
 
-	_, err := db.f.ReadAt(page, pageNum*PageSize)
+	_, err := db.f.ReadAt(page, pageNum*db.pageSize)
 	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("mdb: read page %d: %w", pageNum, err)
 	}
@@ -119,7 +139,7 @@ func (db *Database) ReadPage(pageNum int64) ([]byte, error) {
 }
 
 func (db *Database) parseHeader() error {
-	page := make([]byte, PageSize)
+	page := make([]byte, MinPageSize)
 
 	_, err := db.f.ReadAt(page, 0)
 	if err != nil {
@@ -148,6 +168,14 @@ func (db *Database) parseHeader() error {
 	db.Header.SortOrder = binary.LittleEndian.Uint32(page[offsetSortOrder:])
 
 	return nil
+}
+
+func pageSizeForJetVersion(v uint32) int {
+	if v == JetVersion3 {
+		return PageSizeJet3
+	}
+
+	return PageSizeJet4
 }
 
 // PageType returns the type byte of a page.

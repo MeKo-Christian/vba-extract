@@ -1,0 +1,88 @@
+package mdb
+
+import (
+	"encoding/binary"
+	"os"
+	"testing"
+)
+
+func writeSyntheticDB(t *testing.T, pageSize, pageCount int, jetVersion uint32) string {
+	t.Helper()
+
+	data := make([]byte, pageSize*pageCount)
+	copy(data[0:4], magicBytes[:])
+	binary.LittleEndian.PutUint32(data[offsetJetVersion:], jetVersion)
+
+	if pageCount > 2 {
+		data[2*pageSize] = PageTypeTDEF
+	}
+
+	f, err := os.CreateTemp("", "mdb-pagesize-*.mdb")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
+
+	_, err = f.Write(data)
+	if err != nil {
+		_ = f.Close()
+		t.Fatalf("Write: %v", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	return f.Name()
+}
+
+func TestOpenJet3Uses2048PageSize(t *testing.T) {
+	path := writeSyntheticDB(t, 2048, 4, JetVersion3)
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	t.Cleanup(func() { _ = db.Close() })
+
+	if db.PageSize() != 2048 {
+		t.Fatalf("PageSize = %d, want 2048", db.PageSize())
+	}
+
+	if db.PageCount() != 4 {
+		t.Fatalf("PageCount = %d, want 4", db.PageCount())
+	}
+
+	page2, err := db.ReadPage(2)
+	if err != nil {
+		t.Fatalf("ReadPage(2): %v", err)
+	}
+
+	if PageType(page2) != PageTypeTDEF {
+		t.Fatalf("PageType(page2) = %#x, want %#x", PageType(page2), PageTypeTDEF)
+	}
+}
+
+func TestOpenJet4Uses4096PageSize(t *testing.T) {
+	path := writeSyntheticDB(t, 4096, 3, JetVersion4)
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	t.Cleanup(func() { _ = db.Close() })
+
+	if db.PageSize() != 4096 {
+		t.Fatalf("PageSize = %d, want 4096", db.PageSize())
+	}
+
+	if db.PageCount() != 3 {
+		t.Fatalf("PageCount = %d, want 3", db.PageCount())
+	}
+}
