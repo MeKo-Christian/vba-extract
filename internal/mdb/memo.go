@@ -15,6 +15,10 @@ const (
 // ResolveMemo resolves a MEMO/OLE field reference to its full data.
 // The raw bytes from the variable column area contain a 12-byte reference (Jet4).
 func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
+	if db.IsJet3() {
+		return db.resolveMemoJet3(raw)
+	}
+
 	if len(raw) == 0 {
 		return nil, nil
 	}
@@ -90,6 +94,10 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 	}
 }
 
+func (db *Database) resolveMemoJet3(_ []byte) ([]byte, error) {
+	return nil, ErrJet3LvalLayoutUnsupported
+}
+
 // readLvalRecord reads a single record from an LVAL page.
 func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte, error) {
 	page, err := db.ReadPage(pageNum)
@@ -109,18 +117,22 @@ func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte
 	}
 
 	rowOff := dataRowTable + rowID*2
+	if rowOff+2 > len(page) {
+		return nil, fmt.Errorf("mdb: LVAL page %d row %d offset table out of range", pageNum, rowID)
+	}
+
 	offVal := binary.LittleEndian.Uint16(page[rowOff:])
 	offset := int(offVal & rowOffsetMask)
 
 	var rowEnd int
 	if rowID == 0 {
-		rowEnd = PageSize
+		rowEnd = len(page)
 	} else {
 		prevOff := binary.LittleEndian.Uint16(page[rowOff-2:])
 		rowEnd = int(prevOff & rowOffsetMask)
 	}
 
-	if offset >= rowEnd || rowEnd > PageSize {
+	if offset >= rowEnd || rowEnd > len(page) {
 		return nil, fmt.Errorf("mdb: LVAL page %d row %d invalid bounds", pageNum, rowID)
 	}
 
@@ -164,18 +176,22 @@ func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byt
 		}
 
 		rowOff := dataRowTable + currentRow*2
+		if rowOff+2 > len(page) {
+			break
+		}
+
 		offVal := binary.LittleEndian.Uint16(page[rowOff:])
 		offset := int(offVal & rowOffsetMask)
 
 		var rowEnd int
 		if currentRow == 0 {
-			rowEnd = PageSize
+			rowEnd = len(page)
 		} else {
 			prevOff := binary.LittleEndian.Uint16(page[rowOff-2:])
 			rowEnd = int(prevOff & rowOffsetMask)
 		}
 
-		if offset >= rowEnd || rowEnd > PageSize {
+		if offset >= rowEnd || rowEnd > len(page) {
 			break
 		}
 

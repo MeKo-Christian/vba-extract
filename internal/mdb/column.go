@@ -31,7 +31,7 @@ func (td *TableDef) DataPages() ([]int64, error) {
 	buf := make([]byte, 8) // only need first few bytes per page
 
 	for i := int64(1); i < td.db.pageCount; i++ {
-		_, err := td.db.f.ReadAt(buf, i*PageSize)
+		_, err := td.db.f.ReadAt(buf, i*td.db.pageSize)
 		if err != nil {
 			continue
 		}
@@ -85,7 +85,7 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 
 		for rowIdx := range numRows {
 			rowOff := dataRowTable + rowIdx*2
-			if rowOff+2 > PageSize {
+			if rowOff+2 > len(page) {
 				break
 			}
 
@@ -102,20 +102,20 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 			}
 
 			offset := int(offVal & rowOffsetMask)
-			if offset >= PageSize {
+			if offset >= len(page) {
 				continue
 			}
 
 			// Determine row end: previous row's start offset, or page end for first row.
 			var rowEnd int
 			if rowIdx == 0 {
-				rowEnd = PageSize
+				rowEnd = len(page)
 			} else {
 				prevOff := binary.LittleEndian.Uint16(page[rowOff-2:])
 				rowEnd = int(prevOff & rowOffsetMask)
 			}
 
-			if offset >= rowEnd || rowEnd > PageSize {
+			if offset >= rowEnd || rowEnd > len(page) {
 				continue
 			}
 
@@ -140,6 +140,10 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 //	START: [num_cols (2)] [fixed_data] [var_col_data...]
 //	END:   [...] [var_offset_table ((nvc+1)*2)] [num_var_cols (2)] [null_mask (ceil(num_cols/8))]
 func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
+	if td.db != nil && td.db.IsJet3() {
+		return td.parseRowJet3(data, sortedCols)
+	}
+
 	if len(data) < 4 {
 		return nil, fmt.Errorf("mdb: row too short (%d bytes)", len(data))
 	}
@@ -210,6 +214,10 @@ func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
 	}
 
 	return row, nil
+}
+
+func (td *TableDef) parseRowJet3(_ []byte, _ []*Column) (Row, error) {
+	return nil, ErrJet3RowLayoutUnsupported
 }
 
 // readFixedColumn reads a fixed-length column value from row data.

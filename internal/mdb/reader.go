@@ -44,6 +44,8 @@ const (
 var magicBytes = [4]byte{0x00, 0x01, 0x00, 0x00}
 
 var ErrJet3TableLayoutUnsupported = errors.New("mdb: Jet 3.5 table layout parsing is not implemented")
+var ErrJet3RowLayoutUnsupported = errors.New("mdb: Jet 3.5 row layout parsing is not implemented")
+var ErrJet3LvalLayoutUnsupported = errors.New("mdb: Jet 3.5 LVAL/MEMO parsing is not implemented")
 
 // Header holds parsed database header fields from page 0.
 type Header struct {
@@ -91,7 +93,7 @@ func Open(path string) (*Database, error) {
 		return nil, err
 	}
 
-	db.pageSize = int64(pageSizeForJetVersion(db.Header.JetVersion))
+	db.pageSize = detectPageSize(f, fi.Size(), db.Header.JetVersion)
 	if fi.Size() < db.pageSize {
 		f.Close()
 		return nil, fmt.Errorf("mdb: file too small for page size %d (%d bytes)", db.pageSize, fi.Size())
@@ -119,7 +121,12 @@ func (db *Database) PageSize() int64 {
 
 // IsJet4 returns true if the database uses Jet4 or later format.
 func (db *Database) IsJet4() bool {
-	return db.Header.JetVersion >= JetVersion4
+	return db.pageSize == PageSizeJet4
+}
+
+// IsJet3 returns true if the database uses Jet 3.x page layout.
+func (db *Database) IsJet3() bool {
+	return db.pageSize == PageSizeJet3
 }
 
 // ReadPage reads a single page by page number.
@@ -170,12 +177,62 @@ func (db *Database) parseHeader() error {
 	return nil
 }
 
-func pageSizeForJetVersion(v uint32) int {
-	if v == JetVersion3 {
+func detectPageSize(f *os.File, fileSize int64, jetVersion uint32) int64 {
+	candidates := []int64{PageSizeJet4, PageSizeJet3}
+	if jetVersion == JetVersion3 {
+		candidates = []int64{PageSizeJet3, PageSizeJet4}
+	}
+
+	for _, candidate := range candidates {
+		if looksLikePageLayout(f, fileSize, candidate) {
+			return candidate
+		}
+	}
+
+	// Fallback to version when layout probing is inconclusive.
+	if jetVersion == JetVersion3 {
 		return PageSizeJet3
 	}
 
-	return PageSizeJet4
+	if fileSize%PageSizeJet4 == 0 {
+		return PageSizeJet4
+	}
+
+	return PageSizeJet3
+}
+
+func looksLikePageLayout(f *os.File, fileSize int64, pageSize int64) bool {
+	if fileSize < pageSize*3 {
+		return false
+	}
+
+	// A valid database should have MSysObjects TDEF on page 2.
+	page2Type := make([]byte, 1)
+	_, err := f.ReadAt(page2Type, 2*pageSize)
+	if err != nil && err != io.EOF {
+		return false
+	}
+
+	if page2Type[0] != PageTypeTDEF {
+		return false
+	}
+
+	page1Type := make([]byte, 1)
+	_, err = f.ReadAt(page1Type, pageSize)
+	if err != nil && err != io.EOF {
+		return false
+	}
+
+	return isKnownPageType(page1Type[0])
+}
+
+func isKnownPageType(t byte) bool {
+	switch t {
+	case PageTypeDB, PageTypeData, PageTypeTDEF, PageTypeIIdx, PageTypeLIdx, PageTypeUsage:
+		return true
+	default:
+		return false
+	}
 }
 
 // PageType returns the type byte of a page.

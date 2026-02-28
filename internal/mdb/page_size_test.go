@@ -2,6 +2,7 @@ package mdb
 
 import (
 	"encoding/binary"
+	"errors"
 	"os"
 	"testing"
 )
@@ -54,6 +55,14 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 		t.Fatalf("PageSize = %d, want 2048", db.PageSize())
 	}
 
+	if !db.IsJet3() {
+		t.Fatal("IsJet3() = false, want true")
+	}
+
+	if db.IsJet4() {
+		t.Fatal("IsJet4() = true, want false")
+	}
+
 	if db.PageCount() != 4 {
 		t.Fatalf("PageCount = %d, want 4", db.PageCount())
 	}
@@ -65,6 +74,22 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 
 	if PageType(page2) != PageTypeTDEF {
 		t.Fatalf("PageType(page2) = %#x, want %#x", PageType(page2), PageTypeTDEF)
+	}
+
+	_, err = db.ReadTableDef(2)
+	if !errors.Is(err, ErrJet3TableLayoutUnsupported) {
+		t.Fatalf("ReadTableDef error = %v, want %v", err, ErrJet3TableLayoutUnsupported)
+	}
+
+	_, err = db.ResolveMemo([]byte{1})
+	if !errors.Is(err, ErrJet3LvalLayoutUnsupported) {
+		t.Fatalf("ResolveMemo error = %v, want %v", err, ErrJet3LvalLayoutUnsupported)
+	}
+
+	td := &TableDef{db: db}
+	_, err = td.parseRow([]byte{0, 0, 0, 0}, nil)
+	if !errors.Is(err, ErrJet3RowLayoutUnsupported) {
+		t.Fatalf("parseRow error = %v, want %v", err, ErrJet3RowLayoutUnsupported)
 	}
 }
 
@@ -82,7 +107,31 @@ func TestOpenJet4Uses4096PageSize(t *testing.T) {
 		t.Fatalf("PageSize = %d, want 4096", db.PageSize())
 	}
 
+	if db.IsJet3() {
+		t.Fatal("IsJet3() = true, want false")
+	}
+
+	if !db.IsJet4() {
+		t.Fatal("IsJet4() = false, want true")
+	}
+
 	if db.PageCount() != 3 {
 		t.Fatalf("PageCount = %d, want 3", db.PageCount())
+	}
+}
+
+func TestOpenPrefersPageLayoutOverJetVersionField(t *testing.T) {
+	// Header says JetVersion3, but actual layout is 4K pages.
+	path := writeSyntheticDB(t, 4096, 4, JetVersion3)
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	t.Cleanup(func() { _ = db.Close() })
+
+	if db.PageSize() != 4096 {
+		t.Fatalf("PageSize = %d, want 4096", db.PageSize())
 	}
 }
