@@ -20,11 +20,13 @@ var extractCmd = &cobra.Command{
 	Use:   "extract [files...]",
 	Short: "Extract VBA modules from one or more Access files",
 	Args:  cobra.MinimumNArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		inputs, err := discoverInputFiles(args, extractRecursive)
 		if err != nil {
 			return err
 		}
+
+		out := cmd.OutOrStdout()
 
 		if len(inputs) == 0 {
 			return errors.New("no .mdb/.accdb files found in inputs")
@@ -57,7 +59,7 @@ var extractCmd = &cobra.Command{
 			if loadErr != nil {
 				failed++
 
-				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)
+				fmt.Fprintf(out, "%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)
 
 				if extractStrict {
 					return loadErr
@@ -70,7 +72,7 @@ var extractCmd = &cobra.Command{
 			if writeErr != nil {
 				failed++
 
-				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), writeErr)
+				fmt.Fprintf(out, "%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), writeErr)
 
 				if extractStrict {
 					return writeErr
@@ -81,10 +83,10 @@ var extractCmd = &cobra.Command{
 
 			writtenModules += count
 			totalLines += lines
-			fmt.Printf("%s %s -> modules=%d lines=%d\n", colorize("32", "OK"), filepath.Base(file), count, lines)
+			fmt.Fprintf(out, "%s %s -> modules=%d lines=%d\n", colorize("32", "OK"), filepath.Base(file), count, lines)
 		}
 
-		fmt.Printf("summary: processed=%d modules=%d lines=%d failed=%d output=%s\n", processed, writtenModules, totalLines, failed, baseOut)
+		fmt.Fprintf(out, "summary: processed=%d modules=%d lines=%d failed=%d output=%s\n", processed, writtenModules, totalLines, failed, baseOut)
 
 		if extractStrict && failed > 0 {
 			return fmt.Errorf("strict mode: %d file(s) failed", failed)

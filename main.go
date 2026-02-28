@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/MeKo-Tech/vba-extract/cmd"
+	"github.com/MeKo-Christian/accessdump/cmd"
 )
 
 func main() {

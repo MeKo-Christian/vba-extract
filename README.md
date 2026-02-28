@@ -1,10 +1,10 @@
-# vba-extract
+# accessdump
 
 Extract VBA source code from Microsoft Access databases (`.mdb` / `.accdb`) on Linux — no Windows, no Wine, no ODBC drivers required.
 
 ## What it does
 
-Access databases embed VBA projects as compressed binary streams inside the database file. `vba-extract` reads the raw Jet/ACE page format, locates the VBA project, decompresses each module's source, and writes `.bas` / `.cls` files that can be opened in any editor or version-controlled.
+Access databases embed VBA projects as compressed binary streams inside the database file. `accessdump` reads the raw Jet/ACE page format, locates the VBA project, decompresses each module's source, and writes `.bas` / `.cls` files that can be opened in any editor or version-controlled.
 
 It handles two classes of database:
 
@@ -17,15 +17,15 @@ It handles two classes of database:
 ## Installation
 
 ```sh
-go install github.com/MeKo-Tech/vba-extract@latest
+go install github.com/MeKo-Tech/accessdump@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/MeKo-Tech/vba-extract
-cd vba-extract
-go build -o vba-extract .
+git clone https://github.com/MeKo-Tech/accessdump
+cd accessdump
+go build -o accessdump .
 ```
 
 **Requires Go 1.22 or later.**
@@ -36,34 +36,34 @@ go build -o vba-extract .
 
 ```sh
 # Single file — writes to vba-output/<dbname>/
-vba-extract extract MyDatabase.mdb
+accessdump extract MyDatabase.mdb
 
 # Multiple files
-vba-extract extract *.mdb
+accessdump extract *.mdb
 
 # Recurse into a directory
-vba-extract extract --recursive /path/to/databases/
+accessdump extract --recursive /path/to/databases/
 
 # Write all modules into a single flat directory
-vba-extract extract --flat --output-dir ./src MyDatabase.mdb
+accessdump extract --flat --output-dir ./src MyDatabase.mdb
 
 # Skip duplicate databases (by file hash)
-vba-extract extract --dedupe *.mdb
+accessdump extract --dedupe *.mdb
 
 # Stop on first error
-vba-extract extract --strict *.mdb
+accessdump extract --strict *.mdb
 
 # Show recovery details
-vba-extract extract --verbose MyDatabase.mdb
+accessdump extract --verbose MyDatabase.mdb
 ```
 
 ### List modules without extracting
 
 ```sh
-vba-extract list MyDatabase.mdb
+accessdump list MyDatabase.mdb
 
 # JSON output
-vba-extract list --json MyDatabase.mdb
+accessdump list --json MyDatabase.mdb
 ```
 
 Example output:
@@ -80,13 +80,13 @@ ThisWorkbook                   document   ThisWorkbook                    542   
 
 ```sh
 # Basic info
-vba-extract info MyDatabase.mdb
+accessdump info MyDatabase.mdb
 
 # Show VBA storage tree
-vba-extract info --tree MyDatabase.mdb
+accessdump info --tree MyDatabase.mdb
 
 # Forensic scan — useful when standard extraction fails
-vba-extract info --forensic MyDatabase.mdb
+accessdump info --forensic MyDatabase.mdb
 ```
 
 ## Output
@@ -113,7 +113,7 @@ Use `--output-dir` to specify the root directory, and `--flat` to skip the per-d
 
 ## How forensic recovery works
 
-When a database's `MSysAccessStorage` system table is missing or its VBA module references have been stripped, `vba-extract` falls back to a two-pass LVAL page scan:
+When a database's `MSysAccessStorage` system table is missing or its VBA module references have been stripped, `accessdump` falls back to a two-pass LVAL page scan:
 
 1. **Pass 1** — reads every data page and builds a map of all LVAL chain next-pointers, identifying which records are chain _starts_ vs. _continuations_.
 2. **Pass 2** — for each chain start whose content byte pattern suggests a VBA module stream, reads up to 256 KB and scans for a valid MS-OVBA `CompressedContainer`. If decompression succeeds and the output contains `Attribute VB_Name`, the module is recovered.

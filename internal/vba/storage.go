@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/MeKo-Tech/vba-extract/internal/mdb"
+	"github.com/MeKo-Christian/accessdump/internal/mdb"
 )
 
 // StorageNode is one entry from MSysAccessStorage.
@@ -50,10 +50,7 @@ func LoadStorageTree(db *mdb.Database) (*StorageTree, error) {
 	}
 
 	for _, row := range rows {
-		node, err := rowToNode(db, row)
-		if err != nil {
-			return nil, err
-		}
+		node := rowToNode(db, row)
 
 		if node == nil {
 			continue
@@ -82,7 +79,8 @@ func LoadStorageTree(db *mdb.Database) (*StorageTree, error) {
 }
 
 func findMSysAccessStorageTable(db *mdb.Database) (*mdb.TableDef, error) {
-	if td, err := db.FindTable("MSysAccessStorage"); err == nil {
+	td, err := db.FindTable("MSysAccessStorage")
+	if err == nil {
 		return td, nil
 	}
 
@@ -100,10 +98,10 @@ func findMSysAccessStorageTable(db *mdb.Database) (*mdb.TableDef, error) {
 	return nil, errors.New("vba: table MSysAccessStorage not found")
 }
 
-func rowToNode(db *mdb.Database, row mdb.Row) (*StorageNode, error) {
+func rowToNode(db *mdb.Database, row mdb.Row) *StorageNode {
 	id, ok := asInt32(row["Id"])
 	if !ok {
-		return nil, nil
+		return nil
 	}
 
 	node := &StorageNode{
@@ -117,7 +115,7 @@ func rowToNode(db *mdb.Database, row mdb.Row) (*StorageNode, error) {
 
 	lvRaw, ok := asBytes(row["Lv"])
 	if !ok || len(lvRaw) == 0 {
-		return node, nil
+		return node
 	}
 
 	node.LvRaw = lvRaw
@@ -125,12 +123,12 @@ func rowToNode(db *mdb.Database, row mdb.Row) (*StorageNode, error) {
 	resolved, err := db.ResolveMemo(lvRaw)
 	if err != nil {
 		node.ResolveErr = fmt.Errorf("vba: resolve Lv for node %d (%q): %w", node.ID, node.Name, err)
-		return node, nil
+		return node
 	}
 
 	node.Data = resolved
 
-	return node, nil
+	return node
 }
 
 func asInt32(v any) (int32, bool) {
@@ -295,7 +293,8 @@ func (st *StorageTree) RequiredStreams() (map[string]*StorageNode, error) {
 	requiredNames := []string{"PROJECT", "PROJECTwm", "dir", "_VBA_PROJECT"}
 	result := make(map[string]*StorageNode, len(requiredNames))
 
-	if vbaProject, err := st.VBAProjectNode(); err == nil {
+	vbaProject, err := st.VBAProjectNode()
+	if err == nil {
 		subtree := st.subtree(vbaProject.ID)
 		for _, name := range requiredNames {
 			for _, node := range subtree {
@@ -334,34 +333,6 @@ func (st *StorageTree) RequiredStreams() (map[string]*StorageNode, error) {
 	}
 
 	return result, nil
-}
-
-func (st *StorageTree) subtree(parentID int32) []*StorageNode {
-	var out []*StorageNode
-	visited := map[int32]bool{}
-	var walk func(int32)
-
-	walk = func(pid int32) {
-		if visited[pid] {
-			return
-		}
-
-		visited[pid] = true
-
-		children := st.Children[pid]
-		for _, child := range children {
-			if child.ID == pid {
-				continue
-			}
-
-			out = append(out, child)
-			walk(child.ID)
-		}
-	}
-
-	walk(parentID)
-
-	return out
 }
 
 // ModuleStreams returns all child streams under VBA folder excluding required streams.
@@ -436,6 +407,34 @@ func (st *StorageTree) ModuleStreams() ([]*StorageNode, error) {
 	return modules, nil
 }
 
+func (st *StorageTree) subtree(parentID int32) []*StorageNode {
+	var out []*StorageNode
+	visited := map[int32]bool{}
+	var walk func(int32)
+
+	walk = func(pid int32) {
+		if visited[pid] {
+			return
+		}
+
+		visited[pid] = true
+
+		children := st.Children[pid]
+		for _, child := range children {
+			if child.ID == pid {
+				continue
+			}
+
+			out = append(out, child)
+			walk(child.ID)
+		}
+	}
+
+	walk(parentID)
+
+	return out
+}
+
 func (st *StorageTree) findByNameGlobal(name string) *StorageNode {
 	var best *StorageNode
 
@@ -465,7 +464,8 @@ func (st *StorageTree) findLikelyProjectNode() *StorageNode {
 
 		data := node.Data
 		if bytes.Contains(data, []byte("Module=")) || bytes.Contains(data, []byte("DocClass=")) || bytes.Contains(data, []byte("Class=")) {
-			if _, err := ParseProjectStream(data); err == nil {
+			_, err := ParseProjectStream(data)
+			if err == nil {
 				return node
 			}
 		}
@@ -480,10 +480,11 @@ func (st *StorageTree) findLikelyDirNode() *StorageNode {
 			continue
 		}
 
-		if _, err := ParseDirStream(node.Data, func(in []byte) ([]byte, error) {
+		_, err := ParseDirStream(node.Data, func(in []byte) ([]byte, error) {
 			out, _, derr := DecompressContainerWithFallback(in, slog.New(slog.DiscardHandler))
 			return out, derr
-		}); err == nil {
+		})
+		if err == nil {
 			return node
 		}
 	}

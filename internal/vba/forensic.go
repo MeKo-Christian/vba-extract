@@ -52,7 +52,8 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 
 		data := node.Data
 
-		if project, err := ParseProjectStream(data); err == nil && project != nil && len(project.Modules) > 0 {
+		project, err := ParseProjectStream(data)
+		if err == nil && project != nil && len(project.Modules) > 0 {
 			report.ProjectCandidates++
 			report.Hits = append(report.Hits, ForensicHit{
 				NodeID:   node.ID,
@@ -65,10 +66,11 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 			})
 		}
 
-		if dir, err := ParseDirStream(data, func(in []byte) ([]byte, error) {
+		dir, err := ParseDirStream(data, func(in []byte) ([]byte, error) {
 			out, _, derr := DecompressContainerWithFallback(in, slog.New(slog.DiscardHandler))
 			return out, derr
-		}); err == nil && dir != nil && len(dir.Modules) > 0 {
+		})
+		if err == nil && dir != nil && len(dir.Modules) > 0 {
 			report.DirCandidates++
 			report.Hits = append(report.Hits, ForensicHit{
 				NodeID:   node.ID,
@@ -96,7 +98,8 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 		}
 
 		if len(data) > 0 && data[0] == compressedContainerSig {
-			if dec, _, err := DecompressContainerWithFallback(data, slog.New(slog.DiscardHandler)); err == nil {
+			dec, _, err := DecompressContainerWithFallback(data, slog.New(slog.DiscardHandler))
+			if err == nil {
 				text := cleanupVBA(decodeBestText(dec))
 				if scoreVBAText(text) >= 3 {
 					report.CompressedCandidates++

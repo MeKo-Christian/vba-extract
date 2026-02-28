@@ -11,7 +11,7 @@ import (
 const (
 	PageSize = 4096
 
-	// Jet version values at offset 0x14 (little-endian uint32).
+	// JetVersion3 and related constants are Jet version values at offset 0x14 (little-endian uint32).
 	JetVersion3    = 0x00 // Access 97
 	JetVersion4    = 0x01 // Access 2000
 	JetVersion4x   = 0x02 // Access 2002/2003
@@ -20,7 +20,7 @@ const (
 	JetVersionACE5 = 0x05 // Access 2013
 	JetVersionACE6 = 0x06 // Access 2016+
 
-	// Page types (byte 0 of each page).
+	// PageTypeDB and related constants are page types (byte 0 of each page).
 	PageTypeDB    = 0x00
 	PageTypeData  = 0x01
 	PageTypeTDEF  = 0x02
@@ -97,6 +97,27 @@ func (db *Database) PageCount() int64 {
 	return db.pageCount
 }
 
+// IsJet4 returns true if the database uses Jet4 or later format.
+func (db *Database) IsJet4() bool {
+	return db.Header.JetVersion >= JetVersion4
+}
+
+// ReadPage reads a single page by page number.
+func (db *Database) ReadPage(pageNum int64) ([]byte, error) {
+	if pageNum < 0 || pageNum >= db.pageCount {
+		return nil, fmt.Errorf("mdb: page %d out of range (0..%d)", pageNum, db.pageCount-1)
+	}
+
+	page := make([]byte, PageSize)
+
+	_, err := db.f.ReadAt(page, pageNum*PageSize)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("mdb: read page %d: %w", pageNum, err)
+	}
+
+	return page, nil
+}
+
 func (db *Database) parseHeader() error {
 	page := make([]byte, PageSize)
 
@@ -127,27 +148,6 @@ func (db *Database) parseHeader() error {
 	db.Header.SortOrder = binary.LittleEndian.Uint32(page[offsetSortOrder:])
 
 	return nil
-}
-
-// IsJet4 returns true if the database uses Jet4 or later format.
-func (db *Database) IsJet4() bool {
-	return db.Header.JetVersion >= JetVersion4
-}
-
-// ReadPage reads a single page by page number.
-func (db *Database) ReadPage(pageNum int64) ([]byte, error) {
-	if pageNum < 0 || pageNum >= db.pageCount {
-		return nil, fmt.Errorf("mdb: page %d out of range (0..%d)", pageNum, db.pageCount-1)
-	}
-
-	page := make([]byte, PageSize)
-
-	_, err := db.f.ReadAt(page, pageNum*PageSize)
-	if err != nil && err != io.EOF {
-		return nil, fmt.Errorf("mdb: read page %d: %w", pageNum, err)
-	}
-
-	return page, nil
 }
 
 // PageType returns the type byte of a page.

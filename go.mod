@@ -1,4 +1,4 @@
-module github.com/MeKo-Tech/vba-extract
+module github.com/MeKo-Christian/accessdump
 
 go 1.25.0
 

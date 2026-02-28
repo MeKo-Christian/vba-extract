@@ -41,10 +41,10 @@ test-coverage:
 # Run all checks (formatting, linting, tests, tidiness)
 ci: check-formatted test lint check-tidy
 
-# Build the vba-extract binary
+# Build the accessdump binary
 build:
-    go build -o vba-extract .
+    go build -o accessdump .
 
 # Clean build artifacts
 clean:
-    rm -f coverage.out coverage.html vba-extract
+    rm -f coverage.out coverage.html accessdump

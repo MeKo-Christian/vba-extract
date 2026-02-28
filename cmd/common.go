@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/MeKo-Tech/vba-extract/internal/mdb"
-	"github.com/MeKo-Tech/vba-extract/internal/vba"
+	"github.com/MeKo-Christian/accessdump/internal/mdb"
+	"github.com/MeKo-Christian/accessdump/internal/vba"
 )
 
 type listEntry struct {
@@ -246,21 +246,24 @@ func defaultOutputDir() string {
 	return filepath.Join(".", "vba-output")
 }
 
-func printListTable(entries []listEntry) {
-	fmt.Printf("%-30s %-10s %-30s %-8s %-7s\n", "MODULE", "TYPE", "STREAM", "BYTES", "PARTIAL")
+func printListTable(w io.Writer, entries []listEntry) {
+	fmt.Fprintf(w, "%-30s %-10s %-30s %-8s %-7s\n", "MODULE", "TYPE", "STREAM", "BYTES", "PARTIAL")
 
 	for _, e := range entries {
-		fmt.Printf("%-30s %-10s %-30s %-8d %-7v\n", e.Name, e.Type, e.Stream, e.SizeBytes, e.Partial)
+		fmt.Fprintf(w, "%-30s %-10s %-30s %-8d %-7v\n", e.Name, e.Type, e.Stream, e.SizeBytes, e.Partial)
 	}
 }
 
-func printListJSON(entries []listEntry) error {
+func printListJSON(w io.Writer, entries []listEntry) error {
 	b, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(b))
+	_, err = fmt.Fprintln(w, string(b))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

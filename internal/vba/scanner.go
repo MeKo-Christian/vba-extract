@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/MeKo-Tech/vba-extract/internal/mdb"
+	"github.com/MeKo-Christian/accessdump/internal/mdb"
 )
 
 const (

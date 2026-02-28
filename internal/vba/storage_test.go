@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/MeKo-Tech/vba-extract/internal/mdb"
+	"github.com/MeKo-Christian/accessdump/internal/mdb"
 )
 
 const testMDB = "../../testdata/Start.mdb"

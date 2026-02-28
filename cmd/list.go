@@ -13,11 +13,13 @@ var listCmd = &cobra.Command{
 	Use:   "list [file]",
 	Short: "List VBA modules in an Access file",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		modules, err := loadModules(args[0])
 		if err != nil {
 			return err
 		}
+
+		out := cmd.OutOrStdout()
 
 		entries := make([]listEntry, 0, len(modules))
 		for _, m := range modules {
@@ -39,11 +41,11 @@ var listCmd = &cobra.Command{
 		})
 
 		if listJSON {
-			return printListJSON(entries)
+			return printListJSON(out, entries)
 		}
 
-		fmt.Printf("file: %s modules: %d\n", args[0], len(entries))
-		printListTable(entries)
+		fmt.Fprintf(out, "file: %s modules: %d\n", args[0], len(entries))
+		printListTable(out, entries)
 
 		return nil
 	},

@@ -14,9 +14,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "vba-extract",
+	Use:   "accessdump",
 	Short: "Extract VBA source from Access MDB/ACCDB files on Linux",
-	Long:  "vba-extract extracts and inspects VBA projects embedded in Microsoft Access databases.",
+	Long:  "accessdump extracts and inspects VBA projects embedded in Microsoft Access databases.",
 	PersistentPreRun: func(_ *cobra.Command, _ []string) {
 		var h slog.Handler
 		if verbose {
