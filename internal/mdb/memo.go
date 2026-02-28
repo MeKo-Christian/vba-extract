@@ -180,14 +180,22 @@ func (db *Database) readLvalChainWithLayout(pageNum int64, rowID int, totalLen i
 			return nil, fmt.Errorf("mdb: LVAL chain page %d: %w", currentPage, err)
 		}
 
+		if page[0] != PageTypeData {
+			return nil, fmt.Errorf("mdb: LVAL chain page %d type %#x is not data/LVAL", currentPage, page[0])
+		}
+
 		numRows := int(binary.LittleEndian.Uint16(page[numRowsOff:]))
+		if numRows == 0 {
+			return nil, fmt.Errorf("mdb: LVAL chain page %d has no rows", currentPage)
+		}
+
 		if currentRow >= numRows {
-			break
+			return nil, fmt.Errorf("mdb: LVAL chain page %d row %d out of range (%d rows)", currentPage, currentRow, numRows)
 		}
 
 		rowOff := rowTableOff + currentRow*2
 		if rowOff+2 > len(page) {
-			break
+			return nil, fmt.Errorf("mdb: LVAL chain page %d row %d offset table out of range", currentPage, currentRow)
 		}
 
 		offVal := binary.LittleEndian.Uint16(page[rowOff:])
@@ -202,7 +210,7 @@ func (db *Database) readLvalChainWithLayout(pageNum int64, rowID int, totalLen i
 		}
 
 		if offset >= rowEnd || rowEnd > len(page) {
-			break
+			return nil, fmt.Errorf("mdb: LVAL chain page %d row %d invalid bounds", currentPage, currentRow)
 		}
 
 		recordData := page[offset:rowEnd]
@@ -211,7 +219,7 @@ func (db *Database) readLvalChainWithLayout(pageNum int64, rowID int, totalLen i
 		// format as the initial LVAL reference: (pageNum << 8) | rowID.
 		// Zero means end of chain.
 		if len(recordData) < 4 {
-			break
+			return nil, fmt.Errorf("mdb: LVAL chain page %d row %d record too short", currentPage, currentRow)
 		}
 
 		nextPtr := binary.LittleEndian.Uint32(recordData[0:4])

@@ -3,6 +3,7 @@ package mdb
 import (
 	"encoding/binary"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -118,5 +119,65 @@ func TestResolveMemoJet3MultiPageChain(t *testing.T) {
 
 	if string(got) != "ABCD" {
 		t.Fatalf("ResolveMemo chain = %q, want %q", string(got), "ABCD")
+	}
+}
+
+func TestResolveMemoJet3SinglePageRowOutOfRange(t *testing.T) {
+	path := writeSyntheticJet3WithLvalRows(t, map[int][]byte{
+		3: []byte("HELLO"),
+	})
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	raw := buildLvalRef(LvalSingle, 3, 1, 5, nil) // row 1, but only one row exists
+	_, err = db.ResolveMemo(raw)
+	if err == nil || !strings.Contains(err.Error(), "out of range") {
+		t.Fatalf("ResolveMemo error = %v, want row out-of-range error", err)
+	}
+}
+
+func TestResolveMemoJet3MultiPageInvalidNextPageType(t *testing.T) {
+	nextPtr := make([]byte, 4)
+	binary.LittleEndian.PutUint32(nextPtr, uint32(4<<8))
+	row3 := append(nextPtr, []byte("AB")...)
+
+	// page 4 is intentionally not initialized as data page
+	path := writeSyntheticJet3WithLvalRows(t, map[int][]byte{
+		3: row3,
+	})
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	raw := buildLvalRef(LvalMultiPage, 3, 0, 4, nil)
+	_, err = db.ResolveMemo(raw)
+	if err == nil || !strings.Contains(err.Error(), "not data/LVAL") {
+		t.Fatalf("ResolveMemo error = %v, want invalid next page type error", err)
+	}
+}
+
+func TestResolveMemoJet3MultiPageRecordTooShort(t *testing.T) {
+	// Row payload shorter than 4 bytes cannot contain next pointer.
+	path := writeSyntheticJet3WithLvalRows(t, map[int][]byte{
+		3: []byte("AB"),
+	})
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	raw := buildLvalRef(LvalMultiPage, 3, 0, 2, nil)
+	_, err = db.ResolveMemo(raw)
+	if err == nil || !strings.Contains(err.Error(), "record too short") {
+		t.Fatalf("ResolveMemo error = %v, want record-too-short error", err)
 	}
 }
