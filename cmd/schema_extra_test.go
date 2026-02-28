@@ -19,7 +19,7 @@ func TestWriteSchema_createsFiles(t *testing.T) {
 		},
 	}
 
-	if err := writeSchema(dir, filepath.Join("/data", "mydb.accdb"), s, false); err != nil {
+	if err := writeSchema(dir, filepath.Join("/data", "mydb.accdb"), s, false, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -39,7 +39,7 @@ func TestWriteSchema_flatMode(t *testing.T) {
 	dir := t.TempDir()
 	s := &mdb.Schema{}
 
-	if err := writeSchema(dir, "/data/mydb.mdb", s, true); err != nil {
+	if err := writeSchema(dir, "/data/mydb.mdb", s, true, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -58,7 +58,7 @@ func TestWriteSchema_sqlFileContainsDDL(t *testing.T) {
 		},
 	}
 
-	if err := writeSchema(dir, "/db/shop.mdb", s, true); err != nil {
+	if err := writeSchema(dir, "/db/shop.mdb", s, true, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestWriteSchema_mdFileContainsMarkdown(t *testing.T) {
 		},
 	}
 
-	if err := writeSchema(dir, "/db/orders.mdb", s, true); err != nil {
+	if err := writeSchema(dir, "/db/orders.mdb", s, true, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

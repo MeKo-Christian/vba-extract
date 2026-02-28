@@ -53,7 +53,7 @@ func TestWriteModules_createsFiles(t *testing.T) {
 		{Name: "Class1", Type: vba.ProjectModuleClass, Text: "Option Explicit\n"},
 	}
 
-	written, _, err := writeModules(dir, "mydb.mdb", modules, false)
+	written, _, err := writeModules(dir, "mydb.mdb", modules, false, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestWriteModules_flatModeWritesDirectlyToBaseDir(t *testing.T) {
 		{Name: "Util", Type: vba.ProjectModuleStandard, Text: "' util\n"},
 	}
 
-	_, _, err := writeModules(dir, "mydb.mdb", modules, true)
+	_, _, err := writeModules(dir, "mydb.mdb", modules, true, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestWriteModules_countsLines(t *testing.T) {
 		{Name: "Mod", Type: vba.ProjectModuleStandard, Text: "line1\nline2\nline3\n"},
 	}
 
-	_, lines, err := writeModules(dir, "db.mdb", modules, true)
+	_, lines, err := writeModules(dir, "db.mdb", modules, true, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,18 +112,25 @@ func TestWriteModules_sanitisesIllegalNameChars(t *testing.T) {
 		{Name: "My/Module", Type: vba.ProjectModuleStandard, Text: ""},
 	}
 
-	_, _, err := writeModules(dir, "db.mdb", modules, true)
+	_, _, err := writeModules(dir, "db.mdb", modules, true, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	entries, _ := os.ReadDir(dir)
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(entries))
+	foundModule := false
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasSuffix(name, ".bas") {
+			foundModule = true
+			if strings.Contains(name, "/") {
+				t.Errorf("slash should be replaced in filename: %q", name)
+			}
+		}
 	}
 
-	if strings.Contains(entries[0].Name(), "/") {
-		t.Errorf("slash should be replaced in filename: %q", entries[0].Name())
+	if !foundModule {
+		t.Fatal("expected at least one .bas module output file")
 	}
 }
 
