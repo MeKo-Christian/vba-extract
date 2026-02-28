@@ -16,11 +16,6 @@ import (
 	"github.com/MeKo-Tech/vba-extract/internal/vba"
 )
 
-type dbExtraction struct {
-	Path    string
-	Modules []vba.ExtractedModule
-}
-
 type listEntry struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
@@ -214,7 +209,7 @@ func writeModules(baseOutDir, dbPath string, modules []vba.ExtractedModule, flat
 
 		outPath := filepath.Join(targetDir, filename)
 
-		err := os.WriteFile(outPath, []byte(module.Text), 0o644)
+		err := os.WriteFile(outPath, []byte(module.Text), 0o600)
 		if err != nil {
 			return written, totalLines, fmt.Errorf("write %q: %w", outPath, err)
 		}
@@ -234,7 +229,9 @@ func computeFileHash(path string) (string, error) {
 	defer f.Close()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+
+	_, err = io.Copy(h, f)
+	if err != nil {
 		return "", err
 	}
 

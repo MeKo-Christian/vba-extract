@@ -13,7 +13,7 @@ var listCmd = &cobra.Command{
 	Use:   "list [file]",
 	Short: "List VBA modules in an Access file",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		modules, err := loadModules(args[0])
 		if err != nil {
 			return err

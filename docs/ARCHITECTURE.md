@@ -2,14 +2,14 @@
 
 ## Overview
 
-`vba-extract` reads Microsoft Access database files at the raw binary level,
+`accessdump` reads Microsoft Access database files at the raw binary level,
 locates their embedded VBA project, and decompresses each module's source code.
 It has no runtime dependencies on Windows, ODBC, or any Access library.
 
 ## Package structure
 
-```
-vba-extract/
+```plain
+accessdump/
 ├── main.go                    Entry point
 ├── cmd/
 │   ├── root.go                Cobra CLI root, global flags
@@ -50,7 +50,7 @@ The `internal/mdb` package reads these structures. It does not support Jet 3.5 (
 
 Large field values (MEMO/OLE columns) are stored in LVAL chains:
 
-```
+```plain
 12-byte reference in the row:
   bytes 0-2  : total data length (3-byte little-endian)
   byte  3    : storage type  0x00=multi-page  0x40=single-page  0x80=inline
@@ -68,7 +68,7 @@ Access stores the entire VBA project in the `MSysAccessStorage` system table.
 Each row is a storage node with an ID, parent ID, name, type, and an `Lv` MEMO
 field containing the binary stream data. The tree structure is:
 
-```
+```plain
 ROOT (id=0)
 └── VBAProject
     └── VBA
@@ -100,7 +100,7 @@ Each module stream in the `dir` record has a `MODULEOFFSET` field that gives the
 byte position where the compressed source begins. Everything before that offset
 is compiled p-code (architecture-specific, not source code):
 
-```
+```plain
 Module stream bytes:
   [0 .. SourceOffset-1]  compiled p-code (ignored)
   [SourceOffset ..]      MS-OVBA CompressedContainer (VBA source)
@@ -127,7 +127,7 @@ databases (~154 KB compressed). Duplicate module names are discarded.
 
 ## Extraction flow
 
-```
+```plain
 loadModules(path)
   ├─ mdb.Open()
   ├─ vba.LoadStorageTree()          -- reads MSysAccessStorage

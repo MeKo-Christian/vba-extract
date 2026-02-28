@@ -20,7 +20,7 @@ var extractCmd = &cobra.Command{
 	Use:   "extract [files...]",
 	Short: "Extract VBA modules from one or more Access files",
 	Args:  cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		inputs, err := discoverInputFiles(args, extractRecursive)
 		if err != nil {
 			return err

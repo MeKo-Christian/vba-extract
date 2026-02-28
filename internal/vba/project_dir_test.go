@@ -53,15 +53,22 @@ func TestParseDirStreamNeedsDecompressor(t *testing.T) {
 }
 
 func TestParseDirStreamRecords(t *testing.T) {
-	var data []byte
-	data = append(data, buildDirRecord(0x0019, []byte("Mod1"))...)
-	data = append(data, buildDirRecord(0x001A, []byte("STREAM_ABC"))...)
-	data = append(data, buildDirRecord(0x0032, []byte("S\x00T\x00R\x00"))...)
+	recModule := buildDirRecord(0x0019, []byte("Mod1"))
+	recStream := buildDirRecord(0x001A, []byte("STREAM_ABC"))
+	recNameUni := buildDirRecord(0x0032, []byte("S\x00T\x00R\x00"))
 	off := make([]byte, 4)
 	binary.LittleEndian.PutUint32(off, 123)
-	data = append(data, buildDirRecord(0x0031, off)...)
-	data = append(data, buildDirRecord(0x0021, nil)...)
-	data = append(data, buildDirRecord(0x002B, nil)...)
+	recOffset := buildDirRecord(0x0031, off)
+	recProc := buildDirRecord(0x0021, nil)
+	recTerm := buildDirRecord(0x002B, nil)
+
+	data := make([]byte, 0, len(recModule)+len(recStream)+len(recNameUni)+len(recOffset)+len(recProc)+len(recTerm))
+	data = append(data, recModule...)
+	data = append(data, recStream...)
+	data = append(data, recNameUni...)
+	data = append(data, recOffset...)
+	data = append(data, recProc...)
+	data = append(data, recTerm...)
 
 	info, err := ParseDirStream(data, nil)
 	if err != nil {
@@ -91,21 +98,28 @@ func TestParseDirStreamRecords(t *testing.T) {
 }
 
 func TestParseDirStreamWithDecompressor(t *testing.T) {
-	var records []byte
-	records = append(records, buildDirRecord(0x0019, []byte("Mod1"))...)
-	records = append(records, buildDirRecord(0x001A, []byte("STREAM_ABC"))...)
+	recModule := buildDirRecord(0x0019, []byte("Mod1"))
+	recStream := buildDirRecord(0x001A, []byte("STREAM_ABC"))
 	off := make([]byte, 4)
 	binary.LittleEndian.PutUint32(off, 7)
-	records = append(records, buildDirRecord(0x0031, off)...)
-	records = append(records, buildDirRecord(0x0021, nil)...)
-	records = append(records, buildDirRecord(0x002B, nil)...)
+	recOffset := buildDirRecord(0x0031, off)
+	recProc := buildDirRecord(0x0021, nil)
+	recTerm := buildDirRecord(0x002B, nil)
+
+	records := make([]byte, 0, len(recModule)+len(recStream)+len(recOffset)+len(recProc)+len(recTerm))
+	records = append(records, recModule...)
+	records = append(records, recStream...)
+	records = append(records, recOffset...)
+	records = append(records, recProc...)
+	records = append(records, recTerm...)
 
 	chunkSize := len(records) + 2
-	header := uint16(0x3000 | uint16(chunkSize-3)) // uncompressed chunk
+	header := 0x3000 | uint16(chunkSize-3) // uncompressed chunk
 
-	container := []byte{0x01}
 	h := make([]byte, 2)
 	binary.LittleEndian.PutUint16(h, header)
+	container := make([]byte, 1, 1+len(h)+len(records))
+	container[0] = 0x01
 	container = append(container, h...)
 	container = append(container, records...)
 

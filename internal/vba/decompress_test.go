@@ -23,7 +23,7 @@ func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
 func buildContainerChunk(compressed bool, payload []byte) []byte {
 	chunkSize := len(payload) + 2
 
-	base := uint16(0x3000 | uint16(chunkSize-3))
+	base := 0x3000 | uint16(chunkSize-3)
 	if compressed {
 		base |= 0x8000
 	}

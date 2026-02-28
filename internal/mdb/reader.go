@@ -78,7 +78,8 @@ func Open(path string) (*Database, error) {
 		pageCount: fi.Size() / PageSize,
 	}
 
-	if err := db.parseHeader(); err != nil {
+	err = db.parseHeader()
+	if err != nil {
 		f.Close()
 		return nil, err
 	}
@@ -98,7 +99,9 @@ func (db *Database) PageCount() int64 {
 
 func (db *Database) parseHeader() error {
 	page := make([]byte, PageSize)
-	if _, err := db.f.ReadAt(page, 0); err != nil {
+
+	_, err := db.f.ReadAt(page, 0)
+	if err != nil {
 		return fmt.Errorf("mdb: read header: %w", err)
 	}
 

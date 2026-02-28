@@ -90,11 +90,11 @@ func TestReadMSysAccessStorage(t *testing.T) {
 	for _, row := range rows {
 		name, _ := row["Name"].(string)
 		id, _ := row["Id"].(int32)
-		parentId, _ := row["ParentId"].(int32)
+		parentID, _ := row["ParentId"].(int32)
 
 		typ, _ := row["Type"].(int32)
 		if name == "VBAProject" || name == "VBA" || name == "PROJECT" || name == "dir" {
-			t.Logf("  Id=%d ParentId=%d Name=%q Type=%d", id, parentId, name, typ)
+			t.Logf("  Id=%d ParentId=%d Name=%q Type=%d", id, parentID, name, typ)
 		}
 	}
 }

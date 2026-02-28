@@ -19,7 +19,7 @@ var infoCmd = &cobra.Command{
 	Use:   "info [file]",
 	Short: "Show MDB/ACCDB metadata and VBA project info",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		db, err := mdb.Open(args[0])
 		if err != nil {
 			return err

@@ -1,7 +1,6 @@
 package vba
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -222,11 +221,13 @@ func decodeBestText(raw []byte) string {
 		candidates = append(candidates, string(raw))
 	}
 
-	if decoded, err := charmap.Windows1252.NewDecoder().Bytes(raw); err == nil {
+	decoded, err := charmap.Windows1252.NewDecoder().Bytes(raw)
+	if err == nil {
 		candidates = append(candidates, string(decoded))
 	}
 
-	if decoded, err := charmap.ISO8859_1.NewDecoder().Bytes(raw); err == nil {
+	decoded, err = charmap.ISO8859_1.NewDecoder().Bytes(raw)
+	if err == nil {
 		candidates = append(candidates, string(decoded))
 	}
 
@@ -269,7 +270,7 @@ func scoreVBAText(text string) int {
 	}
 
 	if strings.Contains(t, "docmd") || strings.Contains(t, "msgbox") {
-		score += 1
+		score++
 	}
 
 	printable := 0
@@ -326,68 +327,4 @@ func ExtractModuleMap(st *StorageTree, log *slog.Logger) (map[string]ExtractedMo
 	}
 
 	return out, nil
-}
-
-func joinWarnings(a []string, b ...string) []string {
-	if len(b) == 0 {
-		return a
-	}
-
-	out := make([]string, 0, len(a)+len(b))
-	out = append(out, a...)
-	out = append(out, b...)
-
-	return out
-}
-
-func containsAny(text string, needles []string) bool {
-	for _, n := range needles {
-		if strings.Contains(text, n) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func splitNonEmptyLines(s string) []string {
-	parts := strings.Split(s, "\n")
-
-	out := make([]string, 0, len(parts))
-	for _, line := range parts {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		out = append(out, line)
-	}
-
-	return out
-}
-
-func compactWhitespace(s string) string {
-	return strings.Join(splitNonEmptyLines(strings.ReplaceAll(s, "\r", "\n")), "\n")
-}
-
-func normalizeForMatch(s string) string {
-	s = cleanupVBA(s)
-	s = compactWhitespace(s)
-
-	return strings.TrimSpace(s)
-}
-
-func similarVBA(a, b string) bool {
-	na := normalizeForMatch(a)
-
-	nb := normalizeForMatch(b)
-	if na == "" || nb == "" {
-		return false
-	}
-
-	if na == nb {
-		return true
-	}
-
-	return bytes.Contains([]byte(na), []byte(nb)) || bytes.Contains([]byte(nb), []byte(na))
 }

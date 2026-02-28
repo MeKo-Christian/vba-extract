@@ -12,7 +12,8 @@ const testMDB = "../../testdata/Start.mdb"
 func testDB(t *testing.T) *mdb.Database {
 	t.Helper()
 
-	if _, err := os.Stat(testMDB); os.IsNotExist(err) {
+	_, err := os.Stat(testMDB)
+	if os.IsNotExist(err) {
 		t.Skip("testdata/Start.mdb not available")
 	}
 

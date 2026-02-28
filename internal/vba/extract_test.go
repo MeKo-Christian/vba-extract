@@ -231,7 +231,8 @@ func readExpectedModuleNames(path string) ([]string, error) {
 		names = append(names, line)
 	}
 
-	if err := scanner.Err(); err != nil {
+	err = scanner.Err()
+	if err != nil {
 		return nil, err
 	}
 
@@ -251,7 +252,8 @@ func findOptionalFixture(name string) (string, bool) {
 	candidates = append(candidates, filepath.Join("..", "..", "testdata", name))
 
 	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
+		_, err := os.Stat(candidate)
+		if err == nil {
 			return candidate, true
 		}
 	}

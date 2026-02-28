@@ -93,7 +93,8 @@ func ParseProjectStream(data []byte) (*ProjectInfo, error) {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
+	err = scanner.Err()
+	if err != nil {
 		return nil, fmt.Errorf("vba: scan PROJECT stream: %w", err)
 	}
 
