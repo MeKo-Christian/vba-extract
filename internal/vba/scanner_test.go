@@ -26,7 +26,7 @@ Option Explicit
 Sub Foo()
 End Sub`
 
-	got := extractModuleNameFromText([]byte(text))
+	got := extractModuleNameFromText(text)
 	if got != "MyModule" {
 		t.Errorf("expected MyModule, got %q", got)
 	}
@@ -35,7 +35,7 @@ End Sub`
 func TestExtractModuleNameFromText_caseInsensitive(t *testing.T) {
 	text := `attribute vb_name = "LowerCase"`
 
-	got := extractModuleNameFromText([]byte(text))
+	got := extractModuleNameFromText(text)
 	if got != "LowerCase" {
 		t.Errorf("expected LowerCase, got %q", got)
 	}
@@ -44,7 +44,7 @@ func TestExtractModuleNameFromText_caseInsensitive(t *testing.T) {
 func TestExtractModuleNameFromText_notFound(t *testing.T) {
 	text := "Option Explicit\nSub Foo()\nEnd Sub"
 
-	got := extractModuleNameFromText([]byte(text))
+	got := extractModuleNameFromText(text)
 	if got != "" {
 		t.Errorf("expected empty string, got %q", got)
 	}
