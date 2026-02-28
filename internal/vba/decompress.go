@@ -3,6 +3,7 @@ package vba
 import (
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 )
 
 const (
@@ -79,22 +80,20 @@ func DecompressContainer(data []byte) ([]byte, error) {
 // 1) Standard decompression from byte 0
 // 2) Skip leading bytes and retry from first compressed signature byte (0x01)
 // 3) Return raw bytes as-is
-func DecompressContainerWithFallback(data []byte, verbose bool, logf func(string, ...interface{})) ([]byte, DecompressionStrategy, error) {
+//
+// Debug messages are written to log when a non-standard strategy is used.
+// Pass slog.New(slog.DiscardHandler) to suppress all output.
+func DecompressContainerWithFallback(data []byte, log *slog.Logger) ([]byte, DecompressionStrategy, error) {
 	if len(data) == 0 {
 		return nil, "", fmt.Errorf("vba: empty input for decompression fallback")
 	}
 
 	out, err := DecompressContainer(data)
 	if err == nil {
-		if verbose && logf != nil {
-			logf("vba: decompression strategy=%s", StrategyStandard)
-		}
 		return out, StrategyStandard, nil
 	}
 
-	if verbose && logf != nil {
-		logf("vba: standard decompression failed: %v", err)
-	}
+	log.Debug("vba: standard decompression failed; scanning for compressed container", "err", err)
 
 	for i := 1; i < len(data); i++ {
 		if data[i] != compressedContainerSig {
@@ -106,17 +105,13 @@ func DecompressContainerWithFallback(data []byte, verbose bool, logf func(string
 			continue
 		}
 
-		if verbose && logf != nil {
-			logf("vba: decompression strategy=%s offset=%d", StrategySkipPrefix, i)
-		}
+		log.Debug("vba: decompression used skip-prefix strategy", "strategy", StrategySkipPrefix, "offset", i)
 		return out, StrategySkipPrefix, nil
 	}
 
 	raw := make([]byte, len(data))
 	copy(raw, data)
-	if verbose && logf != nil {
-		logf("vba: decompression strategy=%s", StrategyRawPassthru)
-	}
+	log.Debug("vba: decompression used raw-passthrough strategy", "strategy", StrategyRawPassthru)
 	return raw, StrategyRawPassthru, nil
 }
 

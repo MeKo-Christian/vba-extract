@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -40,9 +41,7 @@ var extractCmd = &cobra.Command{
 				hash, hashErr := computeFileHash(file)
 				if hashErr == nil {
 					if prev, ok := seenHashes[hash]; ok {
-						if verbose {
-							fmt.Printf("skip duplicate: %s (same as %s)\n", file, prev)
-						}
+						slog.Default().Debug("skip duplicate", "file", file, "sameAs", prev)
 						continue
 					}
 					seenHashes[hash] = file
@@ -50,7 +49,7 @@ var extractCmd = &cobra.Command{
 			}
 
 			processed++
-			modules, loadErr := loadModules(file, verbose)
+			modules, loadErr := loadModules(file)
 			if loadErr != nil {
 				failed++
 				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)

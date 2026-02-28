@@ -3,6 +3,7 @@ package vba
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"unicode/utf8"
 
@@ -20,8 +21,12 @@ type ExtractedModule struct {
 	Warnings  []string
 }
 
-// ExtractAllModules extracts VBA source text from storage tree streams.
-func ExtractAllModules(st *StorageTree, verbose bool, logf func(string, ...interface{})) ([]ExtractedModule, error) {
+// ExtractAllModules extracts VBA source text from all modules in a storage tree.
+// It parses the PROJECT stream to discover module names, the dir stream for
+// stream offsets, and decompresses each module's MS-OVBA compressed source.
+// Debug messages (non-standard decompression strategies, dir parse failures)
+// are written to log. Pass slog.New(slog.DiscardHandler) to suppress all output.
+func ExtractAllModules(st *StorageTree, log *slog.Logger) ([]ExtractedModule, error) {
 	required, err := st.RequiredStreams()
 	if err != nil {
 		return nil, err
@@ -41,11 +46,11 @@ func ExtractAllModules(st *StorageTree, verbose bool, logf func(string, ...inter
 	dirNode := required["dir"]
 	if dirNode != nil && len(dirNode.Data) > 0 {
 		dirInfo, err = ParseDirStream(dirNode.Data, func(in []byte) ([]byte, error) {
-			out, _, derr := DecompressContainerWithFallback(in, verbose, logf)
+			out, _, derr := DecompressContainerWithFallback(in, log)
 			return out, derr
 		})
-		if err != nil && verbose && logf != nil {
-			logf("vba: dir parsing failed; fallback mapping will be used: %v", err)
+		if err != nil {
+			log.Debug("vba: dir parsing failed; fallback mapping will be used", "err", err)
 		}
 	}
 
@@ -71,7 +76,7 @@ func ExtractAllModules(st *StorageTree, verbose bool, logf func(string, ...inter
 			}
 		}
 
-		text, warns, partial := extractModuleSource(mapping, verbose, logf)
+		text, warns, partial := extractModuleSource(mapping, log)
 		result.Text = text
 		result.Partial = partial
 		result.Warnings = append(result.Warnings, warns...)
@@ -82,7 +87,7 @@ func ExtractAllModules(st *StorageTree, verbose bool, logf func(string, ...inter
 	return results, nil
 }
 
-func extractModuleSource(mapping ModuleMapping, verbose bool, logf func(string, ...interface{})) (string, []string, bool) {
+func extractModuleSource(mapping ModuleMapping, log *slog.Logger) (string, []string, bool) {
 	if len(mapping.Data) == 0 {
 		return "", []string{"empty module stream data"}, true
 	}
@@ -103,7 +108,7 @@ func extractModuleSource(mapping ModuleMapping, verbose bool, logf func(string, 
 	}
 
 	sourceCandidate := mapping.Data[offset:]
-	finalRaw, srcStrategy, srcErr := DecompressContainerWithFallback(sourceCandidate, verbose, logf)
+	finalRaw, srcStrategy, srcErr := DecompressContainerWithFallback(sourceCandidate, log)
 	if srcErr != nil {
 		warnings = append(warnings, fmt.Sprintf("source decompression failed at offset %d: %v; trying brute-force scan", offset, srcErr))
 		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
@@ -281,9 +286,10 @@ func looksLikeVBASource(text string) bool {
 	return strings.Contains(t, "attribute vb_name") || strings.Contains(t, "option explicit") || strings.Contains(t, "sub ") || strings.Contains(t, "function ")
 }
 
-// ExtractModuleMap provides direct access to extracted text keyed by module name.
-func ExtractModuleMap(st *StorageTree, verbose bool, logf func(string, ...interface{})) (map[string]ExtractedModule, error) {
-	modules, err := ExtractAllModules(st, verbose, logf)
+// ExtractModuleMap is a convenience wrapper around ExtractAllModules that returns
+// the results as a map keyed by module name.
+func ExtractModuleMap(st *StorageTree, log *slog.Logger) (map[string]ExtractedModule, error) {
+	modules, err := ExtractAllModules(st, log)
 	if err != nil {
 		return nil, err
 	}

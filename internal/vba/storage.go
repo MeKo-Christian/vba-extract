@@ -3,6 +3,7 @@ package vba
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -15,8 +16,8 @@ type StorageNode struct {
 	ParentID   int32
 	Name       string
 	Type       int32
-	DateCreate interface{}
-	DateUpdate interface{}
+	DateCreate any
+	DateUpdate any
 	LvRaw      []byte
 	Data       []byte
 	ResolveErr error
@@ -448,7 +449,7 @@ func (st *StorageTree) findLikelyDirNode() *StorageNode {
 			continue
 		}
 		if _, err := ParseDirStream(node.Data, func(in []byte) ([]byte, error) {
-			out, _, derr := DecompressContainerWithFallback(in, false, nil)
+			out, _, derr := DecompressContainerWithFallback(in, slog.New(slog.DiscardHandler))
 			return out, derr
 		}); err == nil {
 			return node

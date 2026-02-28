@@ -2,39 +2,46 @@ package vba
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 )
 
+// ForensicKind classifies how a storage node was identified as a VBA candidate.
 type ForensicKind string
 
 const (
-	ForensicProjectText   ForensicKind = "project-text"
-	ForensicDirRecords    ForensicKind = "dir-records"
-	ForensicVBASourceText ForensicKind = "vba-source-text"
-	ForensicCompressedVBA ForensicKind = "compressed-vba"
-	ForensicAccessArtifact ForensicKind = "access-artifact"
+	ForensicProjectText    ForensicKind = "project-text"     // parsed as a PROJECT stream
+	ForensicDirRecords     ForensicKind = "dir-records"      // parsed as a dir stream
+	ForensicVBASourceText  ForensicKind = "vba-source-text"  // plaintext VBA source
+	ForensicCompressedVBA  ForensicKind = "compressed-vba"   // decompresses to VBA source
+	ForensicAccessArtifact ForensicKind = "access-artifact"  // known Access structural text
 )
 
+// ForensicHit describes a single storage node that may contain VBA data.
 type ForensicHit struct {
 	NodeID   int32
 	NodeName string
 	NodeType int32
 	DataSize int
 	Kind     ForensicKind
-	Score    int
-	Summary  string
+	Score    int    // higher = more likely to be VBA-related
+	Summary  string // short human-readable description
 }
 
+// ForensicReport is the output of ForensicScanStorage.
 type ForensicReport struct {
-	Hits               []ForensicHit
-	ProjectCandidates  int
-	DirCandidates      int
-	SourceCandidates   int
+	Hits                 []ForensicHit
+	ProjectCandidates    int
+	DirCandidates        int
+	SourceCandidates     int
 	CompressedCandidates int
-	ArtifactCandidates int
+	ArtifactCandidates   int
 }
 
+// ForensicScanStorage inspects every storage node in the tree and returns a
+// ranked list of nodes that may contain VBA data. This is useful for debugging
+// databases with non-standard or stripped VBA project structures.
 func ForensicScanStorage(st *StorageTree) ForensicReport {
 	report := ForensicReport{}
 
@@ -59,7 +66,7 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 		}
 
 		if dir, err := ParseDirStream(data, func(in []byte) ([]byte, error) {
-			out, _, derr := DecompressContainerWithFallback(in, false, nil)
+			out, _, derr := DecompressContainerWithFallback(in, slog.New(slog.DiscardHandler))
 			return out, derr
 		}); err == nil && dir != nil && len(dir.Modules) > 0 {
 			report.DirCandidates++
@@ -89,7 +96,7 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 		}
 
 		if len(data) > 0 && data[0] == compressedContainerSig {
-			if dec, _, err := DecompressContainerWithFallback(data, false, nil); err == nil {
+			if dec, _, err := DecompressContainerWithFallback(data, slog.New(slog.DiscardHandler)); err == nil {
 				text := cleanupVBA(decodeBestText(dec))
 				if scoreVBAText(text) >= 3 {
 					report.CompressedCandidates++

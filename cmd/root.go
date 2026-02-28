@@ -1,6 +1,11 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"log/slog"
+	"os"
+
+	"github.com/spf13/cobra"
+)
 
 var (
 	outputDir string
@@ -12,6 +17,15 @@ var rootCmd = &cobra.Command{
 	Use:   "vba-extract",
 	Short: "Extract VBA source from Access MDB/ACCDB files on Linux",
 	Long:  "vba-extract extracts and inspects VBA projects embedded in Microsoft Access databases.",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		var h slog.Handler
+		if verbose {
+			h = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
+		} else {
+			h = slog.DiscardHandler
+		}
+		slog.SetDefault(slog.New(h))
+	},
 }
 
 func Execute() error {

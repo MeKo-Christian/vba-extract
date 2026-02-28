@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -112,25 +113,20 @@ func isAccessFile(path string) bool {
 	return ext == ".mdb" || ext == ".accdb"
 }
 
-func loadModules(path string, verbose bool) ([]vba.ExtractedModule, error) {
+func loadModules(path string) ([]vba.ExtractedModule, error) {
 	db, err := mdb.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open %q: %w", path, err)
 	}
 	defer db.Close()
 
+	log := slog.Default()
 	st, stErr := vba.LoadStorageTree(db)
-
-	logger := func(format string, args ...interface{}) {
-		if verbose {
-			fmt.Fprintf(os.Stderr, format+"\n", args...)
-		}
-	}
 
 	var modules []vba.ExtractedModule
 	var extractErr error
 	if stErr == nil {
-		modules, extractErr = vba.ExtractAllModules(st, verbose, logger)
+		modules, extractErr = vba.ExtractAllModules(st, log)
 		if extractErr == nil && len(modules) > 0 {
 			return modules, nil
 		}
@@ -143,9 +139,8 @@ func loadModules(path string, verbose bool) ([]vba.ExtractedModule, error) {
 	// where the VBA structure was stripped from it but page data remains on disk.
 	scanned, scanErr := vba.ScanOrphanedLvalModules(db)
 	if scanErr == nil && len(scanned) > 0 {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "vba: standard extraction failed (%v); recovered %d modules via raw LVAL scan\n", extractErr, len(scanned))
-		}
+		log.Debug("vba: standard extraction failed; recovered modules via raw LVAL scan",
+			"err", extractErr, "count", len(scanned))
 		return scanned, nil
 	}
 
@@ -154,9 +149,7 @@ func loadModules(path string, verbose bool) ([]vba.ExtractedModule, error) {
 	// that as a database with no VBA rather than a hard error — return empty.
 	// Only propagate errors that indicate a real read failure.
 	if extractErr != nil && scanErr == nil {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "vba: no VBA found in %q (%v)\n", path, extractErr)
-		}
+		log.Debug("vba: no VBA found", "path", path, "err", extractErr)
 		return nil, nil
 	}
 	if extractErr != nil {

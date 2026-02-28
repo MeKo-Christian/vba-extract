@@ -37,6 +37,18 @@ type DirInfo struct {
 // DirDecompressor decodes raw dir stream bytes when compression is used.
 type DirDecompressor func([]byte) ([]byte, error)
 
+// MS-OVBA §2.3.4.2 dir stream record type IDs.
+const (
+	dirRecModuleName            = 0x0019 // MODULENAME record
+	dirRecModuleStreamName      = 0x001A // MODULESTREAMNAME (MBCS)
+	dirRecModuleStreamNameUTF16 = 0x0032 // MODULESTREAMNAME (UTF-16)
+	dirRecModuleOffset          = 0x0031 // MODULEOFFSET: source start in raw stream
+	dirRecModuleTypeProcedural  = 0x0021 // MODULETYPE: procedural (.bas)
+	dirRecModuleTypeClass       = 0x0022 // MODULETYPE: class/document (.cls)
+	dirRecModuleTerminator      = 0x002B // MODULE_TERMINATOR
+	dirRecProjectVersion        = 0x0009 // PROJECTVERSION (has extra 2-byte MinorVersion)
+)
+
 // ParseDirStream parses a dir stream. If the stream appears compressed and no
 // decompressor is provided, ErrDirNeedsDecompression is returned.
 func ParseDirStream(data []byte, decompressor DirDecompressor) (*DirInfo, error) {
@@ -88,40 +100,40 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 		payload := data[i+6 : i+6+recSize]
 
 		switch recID {
-		case 0x0019: // MODULENAME
+		case dirRecModuleName:
 			appendCurrent()
 			current = &DirModule{
 				ModuleName: trimText(payload),
 				Type:       DirModuleUnknown,
 			}
-		case 0x001A: // MODULESTREAMNAME
+		case dirRecModuleStreamName:
 			if current == nil {
 				current = &DirModule{Type: DirModuleUnknown}
 			}
 			current.StreamName = trimText(payload)
-		case 0x0032: // MODULESTREAMNAME_UNICODE
+		case dirRecModuleStreamNameUTF16:
 			// Keep ANSI stream name from 0x001A as canonical; unicode variant is optional.
 			if current == nil {
 				current = &DirModule{Type: DirModuleUnknown}
 			}
-		case 0x0031: // MODULEOFFSET
+		case dirRecModuleOffset:
 			if current == nil {
 				current = &DirModule{Type: DirModuleUnknown}
 			}
 			if len(payload) >= 4 {
 				current.SourceOff = binary.LittleEndian.Uint32(payload[:4])
 			}
-		case 0x0021: // MODULETYPE_PROCEDURAL
+		case dirRecModuleTypeProcedural:
 			if current == nil {
 				current = &DirModule{}
 			}
 			current.Type = DirModuleProcedural
-		case 0x0022: // MODULETYPE_CLASS/DOCUMENT
+		case dirRecModuleTypeClass:
 			if current == nil {
 				current = &DirModule{}
 			}
 			current.Type = DirModuleClass
-		case 0x002B: // MODULE_TERMINATOR
+		case dirRecModuleTerminator:
 			appendCurrent()
 		}
 
@@ -131,7 +143,7 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 		// appended outside the stated Size field (MS-OVBA §2.3.4.2.1.9).
 		// Without this +2 the parser would be 2 bytes misaligned for all
 		// subsequent records.
-		if recID == 0x0009 && i+2 <= len(data) {
+		if recID == dirRecProjectVersion && i+2 <= len(data) {
 			i += 2
 		}
 	}

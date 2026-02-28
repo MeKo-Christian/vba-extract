@@ -14,7 +14,7 @@ var listCmd = &cobra.Command{
 	Short: "List VBA modules in an Access file",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		modules, err := loadModules(args[0], verbose)
+		modules, err := loadModules(args[0])
 		if err != nil {
 			return err
 		}

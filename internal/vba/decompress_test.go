@@ -1,11 +1,24 @@
 package vba
 
 import (
-	"encoding/hex"
+	"context"
 	"encoding/binary"
+	"encoding/hex"
+	"log/slog"
 	"strings"
 	"testing"
 )
+
+// captureHandler records every log record it receives, regardless of level.
+type captureHandler struct{ records []slog.Record }
+
+func (h *captureHandler) Enabled(_ context.Context, _ slog.Level) bool  { return true }
+func (h *captureHandler) WithAttrs(_ []slog.Attr) slog.Handler          { return h }
+func (h *captureHandler) WithGroup(_ string) slog.Handler               { return h }
+func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
+	h.records = append(h.records, r)
+	return nil
+}
 
 func buildContainerChunk(compressed bool, payload []byte) []byte {
 	chunkSize := len(payload) + 2
@@ -129,7 +142,7 @@ func TestDecompressContainerWithFallbackSkipPrefix(t *testing.T) {
 	container = append(container, buildContainerChunk(false, []byte("ok"))...)
 	input := append([]byte{0xAA, 0xBB, 0xCC}, container...)
 
-	out, strategy, err := DecompressContainerWithFallback(input, false, nil)
+	out, strategy, err := DecompressContainerWithFallback(input, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback: %v", err)
 	}
@@ -143,7 +156,7 @@ func TestDecompressContainerWithFallbackSkipPrefix(t *testing.T) {
 
 func TestDecompressContainerWithFallbackRaw(t *testing.T) {
 	input := []byte{0xAA, 0xBB, 0xCC}
-	out, strategy, err := DecompressContainerWithFallback(input, false, nil)
+	out, strategy, err := DecompressContainerWithFallback(input, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback: %v", err)
 	}
@@ -156,21 +169,34 @@ func TestDecompressContainerWithFallbackRaw(t *testing.T) {
 }
 
 func TestDecompressContainerWithFallbackVerboseLog(t *testing.T) {
+	// Standard strategy succeeds silently — no log message expected.
 	container := []byte{0x01}
 	container = append(container, buildContainerChunk(false, []byte("v"))...)
 
-	var logs []string
-	_, strategy, err := DecompressContainerWithFallback(container, true, func(format string, args ...interface{}) {
-		logs = append(logs, format)
-	})
+	stdHandler := &captureHandler{}
+	_, strategy, err := DecompressContainerWithFallback(container, slog.New(stdHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback: %v", err)
 	}
 	if strategy != StrategyStandard {
 		t.Fatalf("strategy = %q, want %q", strategy, StrategyStandard)
 	}
-	if len(logs) == 0 {
-		t.Fatal("expected verbose logs")
+	if len(stdHandler.records) != 0 {
+		t.Fatalf("standard strategy should not log, got %d record(s)", len(stdHandler.records))
+	}
+
+	// Skip-prefix strategy does produce a log message.
+	withPrefix := append([]byte{0x00, 0xFF}, container...) // 2 garbage bytes before the container
+	skipHandler := &captureHandler{}
+	_, strategy, err = DecompressContainerWithFallback(withPrefix, slog.New(skipHandler))
+	if err != nil {
+		t.Fatalf("DecompressContainerWithFallback (skip-prefix): %v", err)
+	}
+	if strategy != StrategySkipPrefix {
+		t.Fatalf("strategy = %q, want %q", strategy, StrategySkipPrefix)
+	}
+	if len(skipHandler.records) == 0 {
+		t.Fatal("skip-prefix strategy should produce a log record")
 	}
 }
 
@@ -190,7 +216,7 @@ func TestDirStreamRegressionFromStartMDB(t *testing.T) {
 		t.Skip("dir stream missing in fixture")
 	}
 
-	dec, _, err := DecompressContainerWithFallback(dirNode.Data, false, nil)
+	dec, _, err := DecompressContainerWithFallback(dirNode.Data, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback(dir): %v", err)
 	}

@@ -2,6 +2,7 @@ package vba
 
 import (
 	"bufio"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,7 +48,7 @@ func TestExtractAllModulesFromStartMDB(t *testing.T) {
 		t.Fatalf("LoadStorageTree: %v", err)
 	}
 
-	modules, err := ExtractAllModules(st, false, nil)
+	modules, err := ExtractAllModules(st, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("ExtractAllModules: %v", err)
 	}
@@ -82,7 +83,7 @@ func TestExtractAllModulesMatchesExpectedManifest(t *testing.T) {
 		t.Fatalf("LoadStorageTree: %v", err)
 	}
 
-	modules, err := ExtractAllModules(st, false, nil)
+	modules, err := ExtractAllModules(st, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("ExtractAllModules: %v", err)
 	}
@@ -136,7 +137,7 @@ func TestOptionalExtractionFixtures(t *testing.T) {
 				t.Fatalf("LoadStorageTree: %v", err)
 			}
 
-			modules, err := ExtractAllModules(st, false, nil)
+			modules, err := ExtractAllModules(st, slog.New(slog.DiscardHandler))
 			if err != nil {
 				t.Fatalf("ExtractAllModules: %v", err)
 			}
@@ -154,7 +155,7 @@ func TestStartMDBSpotCheckCountsAndContent(t *testing.T) {
 		t.Fatalf("LoadStorageTree: %v", err)
 	}
 
-	modules, err := ExtractAllModules(st, false, nil)
+	modules, err := ExtractAllModules(st, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("ExtractAllModules: %v", err)
 	}
@@ -215,12 +216,16 @@ func readExpectedModuleNames(path string) ([]string, error) {
 	return names, nil
 }
 
+// findOptionalFixture looks for a named fixture file in:
+//  1. The directory given by the VBA_FIXTURE_DIR environment variable (if set)
+//  2. ../../testdata/ relative to this package
 func findOptionalFixture(name string) (string, bool) {
-	candidates := []string{
-		filepath.Join("..", "..", "testdata", name),
-		filepath.Join("..", "..", "..", "..", "MeKo", "IPOffice-VBA", "mdb-files", name),
-		filepath.Join("/mnt", "sql-server", name),
+	var candidates []string
+
+	if dir := os.Getenv("VBA_FIXTURE_DIR"); dir != "" {
+		candidates = append(candidates, filepath.Join(dir, name))
 	}
+	candidates = append(candidates, filepath.Join("..", "..", "testdata", name))
 
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
