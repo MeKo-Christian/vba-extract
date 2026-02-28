@@ -224,6 +224,10 @@ func (db *Database) readTableDefJet3(tdefPage int64) (*TableDef, error) {
 	}
 
 	numCols := int(binary.LittleEndian.Uint16(tdefData[tdef3NumCols:]))
+	if numCols <= 0 {
+		return nil, fmt.Errorf("mdb: Jet3 TDEF at page %d has invalid column count %d", tdefPage, numCols)
+	}
+
 	colStart := tdef3ColsStart + int(td.NumRealIdxs)*tdef3RIdxEntrySize
 	if colStart+numCols*tdef3ColEntrySize > len(tdefData) {
 		return nil, fmt.Errorf("mdb: Jet3 TDEF at page %d: column data extends past TDEF (%d cols, colStart=%d, tdefLen=%d)",

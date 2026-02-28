@@ -15,6 +15,9 @@ const (
 	dataNumRows   = 0x0C
 	dataRowTable  = 0x0E // row offset table starts here (Jet4: 2 bytes per entry)
 
+	dataNumRowsJet3  = 0x08
+	dataRowTableJet3 = 0x0A // row offset table starts here in Jet3
+
 	// Row offset flags.
 	rowDeleteFlag = 0x8000
 	rowLookupFlag = 0x4000
@@ -56,6 +59,8 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 		return nil, fmt.Errorf("mdb: ReadRows: %w", err)
 	}
 
+	numRowsOff, rowTableOff := dataPageLayoutOffsets(td.db)
+
 	// Sort columns by ColNum for proper ordering.
 	sortedCols := make([]*Column, len(td.Columns))
 	copy(sortedCols, td.Columns)
@@ -81,10 +86,10 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 			continue
 		}
 
-		numRows := int(binary.LittleEndian.Uint16(page[dataNumRows:]))
+		numRows := int(binary.LittleEndian.Uint16(page[numRowsOff:]))
 
 		for rowIdx := range numRows {
-			rowOff := dataRowTable + rowIdx*2
+			rowOff := rowTableOff + rowIdx*2
 			if rowOff+2 > len(page) {
 				break
 			}
@@ -216,8 +221,200 @@ func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
 	return row, nil
 }
 
-func (td *TableDef) parseRowJet3(_ []byte, _ []*Column) (Row, error) {
-	return nil, ErrJet3RowLayoutUnsupported
+func (td *TableDef) parseRowJet3(data []byte, sortedCols []*Column) (Row, error) {
+	if len(data) < 2 {
+		return nil, fmt.Errorf("mdb: Jet3 row too short (%d bytes)", len(data))
+	}
+
+	rowCols := int(data[0])
+	if rowCols <= 0 {
+		return nil, errors.New("mdb: Jet3 row has 0 columns")
+	}
+
+	bitmaskLen := (rowCols + 7) / 8
+	rowEnd := len(data) - 1
+	nullMaskStart := rowEnd - bitmaskLen + 1
+	if nullMaskStart < 1 || nullMaskStart > len(data) {
+		return nil, errors.New("mdb: Jet3 row too short for null mask")
+	}
+
+	nullMask := data[nullMaskStart:]
+
+	hasVarCols := false
+	for _, col := range sortedCols {
+		if !col.IsFixed() {
+			hasVarCols = true
+			break
+		}
+	}
+
+	rowVarCols := 0
+	varOffsets := []int{1}
+
+	if hasVarCols {
+		rowVarColsPos := rowEnd - bitmaskLen
+		if rowVarColsPos < 1 || rowVarColsPos >= len(data) {
+			return nil, errors.New("mdb: Jet3 row too short for var column count")
+		}
+
+		rowVarCols = int(data[rowVarColsPos])
+		if rowVarCols < 0 || rowVarCols > rowCols {
+			return nil, fmt.Errorf("mdb: Jet3 row has invalid var column count %d", rowVarCols)
+		}
+
+		offsets, err := crackJet3VarOffsets(data, rowVarCols, bitmaskLen)
+		if err != nil {
+			return nil, err
+		}
+
+		varOffsets = offsets
+	}
+
+	row := make(Row)
+	fixedColsFound := 0
+	rowFixedCols := rowCols - rowVarCols
+
+	for _, col := range sortedCols {
+		colIdx := int(col.ColNum)
+		if colIdx >= rowCols {
+			row[col.Name] = nil
+			continue
+		}
+
+		byteIdx := colIdx / 8
+		bitMask := byte(1 << (colIdx % 8))
+		if byteIdx >= len(nullMask) || nullMask[byteIdx]&bitMask == 0 {
+			row[col.Name] = nil
+			continue
+		}
+
+		if col.IsFixed() {
+			if fixedColsFound >= rowFixedCols {
+				row[col.Name] = nil
+				continue
+			}
+
+			row[col.Name] = readFixedColumn(data, col, 1)
+			fixedColsFound++
+			continue
+		}
+
+		row[col.Name] = readVarColumnJet3(data, col, varOffsets, rowVarCols)
+	}
+
+	return row, nil
+}
+
+func crackJet3VarOffsets(row []byte, rowVarCols, bitmaskLen int) ([]int, error) {
+	rowStart := 0
+	rowEnd := len(row) - 1
+	rowLen := len(row)
+	numJumps := (rowLen - 1) / 256
+	colPtr := rowEnd - bitmaskLen - numJumps - 1
+	if colPtr < 0 {
+		return nil, errors.New("mdb: Jet3 row too short for variable offset table")
+	}
+
+	// If last jump is a dummy value, ignore it.
+	if numJumps > 0 && ((colPtr-rowStart-rowVarCols)/256 < numJumps) {
+		numJumps--
+	}
+
+	offsets := make([]int, rowVarCols+1)
+	jumpsUsed := 0
+
+	for i := 0; i < rowVarCols+1; i++ {
+		for jumpsUsed < numJumps {
+			jumpIdx := rowEnd - bitmaskLen - jumpsUsed - 1
+			if jumpIdx < 0 || jumpIdx >= len(row) {
+				return nil, errors.New("mdb: Jet3 row jump table out of bounds")
+			}
+
+			if i != int(row[jumpIdx]) {
+				break
+			}
+
+			jumpsUsed++
+		}
+
+		offsetIdx := colPtr - i
+		if offsetIdx < 0 || offsetIdx >= len(row) {
+			return nil, errors.New("mdb: Jet3 row offset table out of bounds")
+		}
+
+		offsets[i] = int(row[offsetIdx]) + jumpsUsed*256
+	}
+
+	return offsets, nil
+}
+
+func readVarColumnJet3(data []byte, col *Column, varOffsets []int, rowVarCols int) any {
+	idx := int(col.OffsetVar)
+	if idx >= rowVarCols || idx+1 >= len(varOffsets) {
+		return nil
+	}
+
+	start := varOffsets[idx]
+	end := varOffsets[idx+1]
+	if start < 0 || end < 0 || start >= end || start >= len(data) || end > len(data) {
+		return nil
+	}
+
+	raw := data[start:end]
+
+	switch col.Type {
+	case ColTypeText:
+		return decodeJet3Text(raw)
+	case ColTypeBool:
+		if len(raw) >= 1 {
+			return raw[0] != 0
+		}
+
+		return nil
+	case ColTypeByte:
+		if len(raw) >= 1 {
+			return raw[0]
+		}
+
+		return nil
+	case ColTypeInt:
+		if len(raw) >= 2 {
+			return readLEInt16(raw[0], raw[1])
+		}
+
+		return nil
+	case ColTypeLong:
+		if len(raw) >= 4 {
+			return readLEInt32(raw)
+		}
+
+		return nil
+	case ColTypeFloat:
+		if len(raw) >= 4 {
+			return math.Float32frombits(binary.LittleEndian.Uint32(raw))
+		}
+
+		return nil
+	case ColTypeDouble, ColTypeDatetime, ColTypeMoney:
+		if len(raw) >= 8 {
+			return math.Float64frombits(binary.LittleEndian.Uint64(raw))
+		}
+
+		return nil
+	default:
+		result := make([]byte, len(raw))
+		copy(result, raw)
+
+		return result
+	}
+}
+
+func dataPageLayoutOffsets(db *Database) (numRowsOff, rowTableOff int) {
+	if db != nil && db.IsJet3() {
+		return dataNumRowsJet3, dataRowTableJet3
+	}
+
+	return dataNumRows, dataRowTable
 }
 
 // readFixedColumn reads a fixed-length column value from row data.

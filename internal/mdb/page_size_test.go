@@ -77,8 +77,8 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 	}
 
 	_, err = db.ReadTableDef(2)
-	if !errors.Is(err, ErrJet3TableLayoutUnsupported) {
-		t.Fatalf("ReadTableDef error = %v, want %v", err, ErrJet3TableLayoutUnsupported)
+	if errors.Is(err, ErrJet3TableLayoutUnsupported) {
+		t.Fatalf("ReadTableDef should use Jet3 parser path, got %v", err)
 	}
 
 	_, err = db.ResolveMemo([]byte{1})
@@ -88,8 +88,8 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 
 	td := &TableDef{db: db}
 	_, err = td.parseRow([]byte{0, 0, 0, 0}, nil)
-	if !errors.Is(err, ErrJet3RowLayoutUnsupported) {
-		t.Fatalf("parseRow error = %v, want %v", err, ErrJet3RowLayoutUnsupported)
+	if errors.Is(err, ErrJet3RowLayoutUnsupported) {
+		t.Fatalf("parseRow should use Jet3 row parser path, got %v", err)
 	}
 }
 
