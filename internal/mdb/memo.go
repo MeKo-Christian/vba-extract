@@ -19,6 +19,14 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 		return db.resolveMemoJet3(raw)
 	}
 
+	return db.resolveMemoWithLayout(raw, dataNumRows, dataRowTable)
+}
+
+func (db *Database) resolveMemoJet3(raw []byte) ([]byte, error) {
+	return db.resolveMemoWithLayout(raw, dataNumRowsJet3, dataRowTableJet3)
+}
+
+func (db *Database) resolveMemoWithLayout(raw []byte, numRowsOff, rowTableOff int) ([]byte, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
@@ -39,6 +47,7 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 	// bytes 8-11: unknown
 	memoLen := int(raw[0]) | int(raw[1])<<8 | int(raw[2])<<16
 	bitmask := raw[3]
+	pageNum, rowID := decodeLvalPageAndRow(raw[4:8])
 
 	switch bitmask {
 	case LvalInline:
@@ -55,30 +64,11 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 
 	case LvalSingle:
 		// Data is in a single LVAL page record.
-		lvalPage := binary.LittleEndian.Uint32(raw[4:8])
-		rowID := int(lvalPage & 0xFF) // low byte = row ID
-
-		pageNum := int64(lvalPage >> 8) // upper 3 bytes = page number
-		if pageNum == 0 {
-			// Alternative encoding: full uint32 page, separate row
-			pageNum = int64(binary.LittleEndian.Uint32(raw[4:8]))
-			rowID = 0
-		}
-
-		return db.readLvalRecord(pageNum, rowID, memoLen)
+		return db.readLvalRecordWithLayout(pageNum, rowID, memoLen, numRowsOff, rowTableOff)
 
 	case LvalMultiPage:
 		// Data spans multiple LVAL pages.
-		lvalPage := binary.LittleEndian.Uint32(raw[4:8])
-		rowID := int(lvalPage & 0xFF)
-
-		pageNum := int64(lvalPage >> 8)
-		if pageNum == 0 {
-			pageNum = int64(binary.LittleEndian.Uint32(raw[4:8]))
-			rowID = 0
-		}
-
-		return db.readLvalChain(pageNum, rowID, memoLen)
+		return db.readLvalChainWithLayout(pageNum, rowID, memoLen, numRowsOff, rowTableOff)
 
 	default:
 		// Unknown bitmask — try treating as inline.
@@ -94,12 +84,26 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 	}
 }
 
-func (db *Database) resolveMemoJet3(_ []byte) ([]byte, error) {
-	return nil, ErrJet3LvalLayoutUnsupported
+func decodeLvalPageAndRow(raw []byte) (int64, int) {
+	lvalPage := binary.LittleEndian.Uint32(raw)
+	rowID := int(lvalPage & 0xFF) // low byte = row ID
+
+	pageNum := int64(lvalPage >> 8) // upper 3 bytes = page number
+	if pageNum == 0 {
+		// Alternative encoding: full uint32 page, separate row
+		pageNum = int64(binary.LittleEndian.Uint32(raw))
+		rowID = 0
+	}
+
+	return pageNum, rowID
 }
 
 // readLvalRecord reads a single record from an LVAL page.
 func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte, error) {
+	return db.readLvalRecordWithLayout(pageNum, rowID, maxLen, dataNumRows, dataRowTable)
+}
+
+func (db *Database) readLvalRecordWithLayout(pageNum int64, rowID int, maxLen int, numRowsOff, rowTableOff int) ([]byte, error) {
 	page, err := db.ReadPage(pageNum)
 	if err != nil {
 		return nil, fmt.Errorf("mdb: LVAL page %d: %w", pageNum, err)
@@ -111,12 +115,12 @@ func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte
 	}
 
 	// LVAL pages use the same row structure as data pages.
-	numRows := int(binary.LittleEndian.Uint16(page[dataNumRows:]))
+	numRows := int(binary.LittleEndian.Uint16(page[numRowsOff:]))
 	if rowID >= numRows {
 		return nil, fmt.Errorf("mdb: LVAL page %d row %d out of range (%d rows)", pageNum, rowID, numRows)
 	}
 
-	rowOff := dataRowTable + rowID*2
+	rowOff := rowTableOff + rowID*2
 	if rowOff+2 > len(page) {
 		return nil, fmt.Errorf("mdb: LVAL page %d row %d offset table out of range", pageNum, rowID)
 	}
@@ -155,11 +159,17 @@ func (db *Database) ReadLvalChain(pageNum int64, rowID int, maxLen int) ([]byte,
 		effective = 1<<31 - 1 // 2GB cap
 	}
 
-	return db.readLvalChain(pageNum, rowID, effective)
+	numRowsOff, rowTableOff := dataPageLayoutOffsets(db)
+
+	return db.readLvalChainWithLayout(pageNum, rowID, effective, numRowsOff, rowTableOff)
 }
 
 // readLvalChain reads a multi-page LVAL chain.
 func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byte, error) {
+	return db.readLvalChainWithLayout(pageNum, rowID, totalLen, dataNumRows, dataRowTable)
+}
+
+func (db *Database) readLvalChainWithLayout(pageNum int64, rowID int, totalLen int, numRowsOff, rowTableOff int) ([]byte, error) {
 	var result []byte
 	currentPage := pageNum
 	currentRow := rowID
@@ -170,12 +180,12 @@ func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byt
 			return nil, fmt.Errorf("mdb: LVAL chain page %d: %w", currentPage, err)
 		}
 
-		numRows := int(binary.LittleEndian.Uint16(page[dataNumRows:]))
+		numRows := int(binary.LittleEndian.Uint16(page[numRowsOff:]))
 		if currentRow >= numRows {
 			break
 		}
 
-		rowOff := dataRowTable + currentRow*2
+		rowOff := rowTableOff + currentRow*2
 		if rowOff+2 > len(page) {
 			break
 		}

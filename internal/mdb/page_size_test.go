@@ -67,6 +67,12 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 		t.Fatalf("PageCount = %d, want 4", db.PageCount())
 	}
 
+	numRowsOff, rowTableOff := db.DataPageLayoutOffsets()
+	if numRowsOff != dataNumRowsJet3 || rowTableOff != dataRowTableJet3 {
+		t.Fatalf("DataPageLayoutOffsets = (%#x,%#x), want (%#x,%#x)",
+			numRowsOff, rowTableOff, dataNumRowsJet3, dataRowTableJet3)
+	}
+
 	page2, err := db.ReadPage(2)
 	if err != nil {
 		t.Fatalf("ReadPage(2): %v", err)
@@ -82,8 +88,8 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 	}
 
 	_, err = db.ResolveMemo([]byte{1})
-	if !errors.Is(err, ErrJet3LvalLayoutUnsupported) {
-		t.Fatalf("ResolveMemo error = %v, want %v", err, ErrJet3LvalLayoutUnsupported)
+	if errors.Is(err, ErrJet3LvalLayoutUnsupported) {
+		t.Fatalf("ResolveMemo should use Jet3 LVAL parser path, got %v", err)
 	}
 
 	td := &TableDef{db: db}
@@ -117,6 +123,12 @@ func TestOpenJet4Uses4096PageSize(t *testing.T) {
 
 	if db.PageCount() != 3 {
 		t.Fatalf("PageCount = %d, want 3", db.PageCount())
+	}
+
+	numRowsOff, rowTableOff := db.DataPageLayoutOffsets()
+	if numRowsOff != dataNumRows || rowTableOff != dataRowTable {
+		t.Fatalf("DataPageLayoutOffsets = (%#x,%#x), want (%#x,%#x)",
+			numRowsOff, rowTableOff, dataNumRows, dataRowTable)
 	}
 }
 

@@ -10,8 +10,6 @@ import (
 
 const (
 	pageTypeData   = 0x01 // LVAL page type byte
-	lvalRowTable   = 0x0E
-	lvalNumRows    = 0x0C
 	lvalRowMask    = 0x1FFF
 	maxOrphanChain = 256 * 1024 // 256 KB: largest observed VBA module is ~154 KB compressed
 )
@@ -27,6 +25,7 @@ var moduleNameRe = regexp.MustCompile(`(?i)Attribute VB_Name\s*=\s*"([^"]{1,80})
 // like they could be module streams.
 func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 	pageCount := int(db.PageCount())
+	numRowsOff, rowTableOff := db.DataPageLayoutOffsets()
 
 	// First pass: collect all next-pointer targets so we can identify chain starts.
 	targets := make(map[int64]struct{}, 8192)
@@ -37,9 +36,9 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 			continue
 		}
 
-		numRows := int(binary.LittleEndian.Uint16(page[lvalNumRows:]))
+		numRows := int(binary.LittleEndian.Uint16(page[numRowsOff:]))
 		for row := range numRows {
-			rowOff := lvalRowTable + row*2
+			rowOff := rowTableOff + row*2
 			if rowOff+2 > len(page) {
 				break
 			}
@@ -71,14 +70,14 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 			continue
 		}
 
-		numRows := int(binary.LittleEndian.Uint16(page[lvalNumRows:]))
+		numRows := int(binary.LittleEndian.Uint16(page[numRowsOff:]))
 		for row := range numRows {
 			key := int64(pg)<<8 | int64(row)
 			if _, isTarget := targets[key]; isTarget {
 				continue // not a chain start
 			}
 
-			rowOff := lvalRowTable + row*2
+			rowOff := rowTableOff + row*2
 			if rowOff+2 > len(page) {
 				break
 			}
@@ -107,7 +106,7 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 			//      the container signature is not at content offset 0.
 			rowEnd := len(page)
 			if row > 0 {
-				prevOff := binary.LittleEndian.Uint16(page[lvalRowTable+(row-1)*2:])
+				prevOff := binary.LittleEndian.Uint16(page[rowTableOff+(row-1)*2:])
 				rowEnd = int(prevOff & lvalRowMask)
 			}
 

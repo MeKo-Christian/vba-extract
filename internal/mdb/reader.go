@@ -129,6 +129,16 @@ func (db *Database) IsJet3() bool {
 	return db.pageSize == PageSizeJet3
 }
 
+// DataPageLayoutOffsets returns (numRowsOffset, rowTableOffset) for the
+// current database page layout.
+func (db *Database) DataPageLayoutOffsets() (int, int) {
+	if db != nil && db.IsJet3() {
+		return dataNumRowsJet3, dataRowTableJet3
+	}
+
+	return dataNumRows, dataRowTable
+}
+
 // ReadPage reads a single page by page number.
 func (db *Database) ReadPage(pageNum int64) ([]byte, error) {
 	if pageNum < 0 || pageNum >= db.pageCount {
