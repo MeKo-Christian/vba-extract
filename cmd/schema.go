@@ -14,10 +14,11 @@ import (
 )
 
 var (
-	schemaRecursive bool
-	schemaFlat      bool
-	schemaStrict    bool
-	schemaDedupe    bool
+	schemaRecursive       bool
+	schemaFlat            bool
+	schemaStrict          bool
+	schemaDedupe          bool
+	schemaOverwriteReadme bool
 )
 
 var schemaCmd = &cobra.Command{
@@ -68,7 +69,7 @@ var schemaCmd = &cobra.Command{
 				continue
 			}
 
-			writeErr := writeSchema(baseOut, file, schema, schemaFlat || format == "flat")
+			writeErr := writeSchema(baseOut, file, schema, schemaFlat||format == "flat", schemaOverwriteReadme)
 			if writeErr != nil {
 				failed++
 
@@ -106,7 +107,7 @@ func loadSchema(path string) (*mdb.Schema, error) {
 	return db.ReadSchema()
 }
 
-func writeSchema(baseOutDir, dbPath string, schema *mdb.Schema, flat bool) error {
+func writeSchema(baseOutDir, dbPath string, schema *mdb.Schema, flat bool, overwriteReadme bool) error {
 	dbName := strings.TrimSuffix(filepath.Base(dbPath), filepath.Ext(dbPath))
 
 	targetDir := baseOutDir
@@ -133,7 +134,30 @@ func writeSchema(baseOutDir, dbPath string, schema *mdb.Schema, flat bool) error
 		return err
 	}
 
-	return nil
+	return writeSchemaReadme(targetDir, dbPath, schema, overwriteReadme)
+}
+
+func writeSchemaReadme(targetDir, dbPath string, schema *mdb.Schema, overwrite bool) error {
+	readmePath := filepath.Join(targetDir, "README.md")
+
+	if !overwrite {
+		if _, err := os.Stat(readmePath); err == nil {
+			return nil
+		}
+	}
+
+	dbName := strings.TrimSuffix(filepath.Base(dbPath), filepath.Ext(dbPath))
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", dbName)
+	fmt.Fprintf(&b, "- Source database: %s\n", filepath.Base(dbPath))
+	fmt.Fprintf(&b, "- Tables: %d\n", len(schema.Tables))
+	fmt.Fprintf(&b, "- Queries: %d\n", len(schema.Queries))
+	fmt.Fprintf(&b, "- Relationships: %d\n", len(schema.Relationships))
+	fmt.Fprintf(&b, "\nSee [%s.schema.sql](./%s.schema.sql) and [%s.schema.md](./%s.schema.md).\n",
+		dbName, dbName, dbName, dbName)
+
+	return os.WriteFile(readmePath, []byte(b.String()), 0o600)
 }
 
 func renderDDL(dbName string, s *mdb.Schema) string {
@@ -321,4 +345,5 @@ func init() {
 	schemaCmd.Flags().BoolVar(&schemaFlat, "flat", false, "Write files without per-database subdirectory")
 	schemaCmd.Flags().BoolVar(&schemaStrict, "strict", false, "Fail on first file error")
 	schemaCmd.Flags().BoolVar(&schemaDedupe, "dedupe", false, "Skip duplicate files by content hash")
+	schemaCmd.Flags().BoolVar(&schemaOverwriteReadme, "overwrite-readme", false, "Overwrite existing README.md files")
 }

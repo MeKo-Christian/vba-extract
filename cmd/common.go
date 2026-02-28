@@ -193,7 +193,7 @@ func safeModuleName(name string) string {
 	return replacer.Replace(name)
 }
 
-func writeModules(baseOutDir, dbPath string, modules []vba.ExtractedModule, flat bool) (int, int, error) {
+func writeModules(baseOutDir, dbPath string, modules []vba.ExtractedModule, flat bool, overwriteReadme bool) (int, int, error) {
 	dbName := strings.TrimSuffix(filepath.Base(dbPath), filepath.Ext(dbPath))
 
 	targetDir := baseOutDir
@@ -223,7 +223,38 @@ func writeModules(baseOutDir, dbPath string, modules []vba.ExtractedModule, flat
 		totalLines += strings.Count(module.Text, "\n")
 	}
 
+	if err := writeModuleReadme(targetDir, dbPath, modules, overwriteReadme); err != nil {
+		return written, totalLines, err
+	}
+
 	return written, totalLines, nil
+}
+
+func writeModuleReadme(targetDir, dbPath string, modules []vba.ExtractedModule, overwrite bool) error {
+	readmePath := filepath.Join(targetDir, "README.md")
+
+	if !overwrite {
+		if _, err := os.Stat(readmePath); err == nil {
+			return nil
+		}
+	}
+
+	dbName := strings.TrimSuffix(filepath.Base(dbPath), filepath.Ext(dbPath))
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", dbName)
+	fmt.Fprintf(&b, "- Source database: %s\n", filepath.Base(dbPath))
+	fmt.Fprintf(&b, "- Extracted module files: %d\n", len(modules))
+
+	if len(modules) > 0 {
+		fmt.Fprintf(&b, "\n## Modules\n\n")
+		for _, m := range modules {
+			ext := strings.TrimPrefix(moduleExt(m.Type), ".")
+			fmt.Fprintf(&b, "- %s (%s)\n", m.Name, ext)
+		}
+	}
+
+	return os.WriteFile(readmePath, []byte(b.String()), 0o600)
 }
 
 func computeFileHash(path string) (string, error) {

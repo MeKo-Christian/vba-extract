@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	extractRecursive bool
-	extractFlat      bool
-	extractStrict    bool
-	extractDedupe    bool
+	extractRecursive       bool
+	extractFlat            bool
+	extractStrict          bool
+	extractDedupe          bool
+	extractOverwriteReadme bool
 )
 
 var extractCmd = &cobra.Command{
@@ -68,7 +69,7 @@ var extractCmd = &cobra.Command{
 				continue
 			}
 
-			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat || format == "flat")
+			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat||format == "flat", extractOverwriteReadme)
 			if writeErr != nil {
 				failed++
 
@@ -102,4 +103,5 @@ func init() {
 	extractCmd.Flags().BoolVar(&extractFlat, "flat", false, "Write all modules into one directory")
 	extractCmd.Flags().BoolVar(&extractStrict, "strict", false, "Fail on first file error")
 	extractCmd.Flags().BoolVar(&extractDedupe, "dedupe", false, "Skip duplicate files by content hash")
+	extractCmd.Flags().BoolVar(&extractOverwriteReadme, "overwrite-readme", false, "Overwrite existing README.md files")
 }
