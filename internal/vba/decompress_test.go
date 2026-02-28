@@ -12,9 +12,9 @@ import (
 // captureHandler records every log record it receives, regardless of level.
 type captureHandler struct{ records []slog.Record }
 
-func (h *captureHandler) Enabled(_ context.Context, _ slog.Level) bool  { return true }
-func (h *captureHandler) WithAttrs(_ []slog.Attr) slog.Handler          { return h }
-func (h *captureHandler) WithGroup(_ string) slog.Handler               { return h }
+func (h *captureHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *captureHandler) WithAttrs(_ []slog.Attr) slog.Handler         { return h }
+func (h *captureHandler) WithGroup(_ string) slog.Handler              { return h }
 func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
 	h.records = append(h.records, r)
 	return nil
@@ -22,14 +22,17 @@ func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
 
 func buildContainerChunk(compressed bool, payload []byte) []byte {
 	chunkSize := len(payload) + 2
+
 	base := uint16(0x3000 | uint16(chunkSize-3))
 	if compressed {
 		base |= 0x8000
 	}
 
-	h := make([]byte, 2)
-	binary.LittleEndian.PutUint16(h, base)
-	return append(h, payload...)
+	chunk := make([]byte, 2+len(payload))
+	binary.LittleEndian.PutUint16(chunk[:2], base)
+	copy(chunk[2:], payload)
+
+	return chunk
 }
 
 func TestDecompressContainerRejectsInvalidSignature(t *testing.T) {
@@ -48,9 +51,9 @@ func TestDecompressContainerRejectsEmpty(t *testing.T) {
 
 func TestDecompressContainerKnownVectors(t *testing.T) {
 	vectors := []struct {
-		name    string
-		inHex   string
-		outHex  string
+		name   string
+		inHex  string
+		outHex string
 	}{
 		{
 			name:   "uncompressed-hello",
@@ -75,6 +78,7 @@ func TestDecompressContainerKnownVectors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode input hex: %v", err)
 			}
+
 			want, err := hex.DecodeString(vector.outHex)
 			if err != nil {
 				t.Fatalf("decode output hex: %v", err)
@@ -84,6 +88,7 @@ func TestDecompressContainerKnownVectors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("DecompressContainer: %v", err)
 			}
+
 			if hex.EncodeToString(got) != vector.outHex {
 				t.Fatalf("output mismatch: got=%x want=%x", got, want)
 			}
@@ -93,8 +98,10 @@ func TestDecompressContainerKnownVectors(t *testing.T) {
 
 func TestDecompressContainerUncompressedChunk(t *testing.T) {
 	payload := []byte("hello")
-	data := []byte{0x01}
-	data = append(data, buildContainerChunk(false, payload)...)
+	chunk := buildContainerChunk(false, payload)
+	data := make([]byte, 1, 1+len(chunk))
+	data[0] = 0x01
+	data = append(data, chunk...)
 
 	out, err := DecompressContainer(data)
 	if err != nil {
@@ -109,8 +116,10 @@ func TestDecompressContainerUncompressedChunk(t *testing.T) {
 func TestDecompressContainerCompressedChunk(t *testing.T) {
 	// Tokens: 'A' 'B' 'C' then copy token offset=3 length=6 -> ABCABCABC
 	payload := []byte{0x08, 'A', 'B', 'C', 0x03, 0x20}
-	data := []byte{0x01}
-	data = append(data, buildContainerChunk(true, payload)...)
+	chunk := buildContainerChunk(true, payload)
+	data := make([]byte, 1, 1+len(chunk))
+	data[0] = 0x01
+	data = append(data, chunk...)
 
 	out, err := DecompressContainer(data)
 	if err != nil {
@@ -123,7 +132,8 @@ func TestDecompressContainerCompressedChunk(t *testing.T) {
 }
 
 func TestDecompressContainerMultiChunk(t *testing.T) {
-	data := []byte{0x01}
+	data := make([]byte, 1, 32)
+	data[0] = 0x01
 	data = append(data, buildContainerChunk(false, []byte("foo"))...)
 	data = append(data, buildContainerChunk(false, []byte("bar"))...)
 
@@ -138,17 +148,21 @@ func TestDecompressContainerMultiChunk(t *testing.T) {
 }
 
 func TestDecompressContainerWithFallbackSkipPrefix(t *testing.T) {
-	container := []byte{0x01}
-	container = append(container, buildContainerChunk(false, []byte("ok"))...)
+	chunk := buildContainerChunk(false, []byte("ok"))
+	container := make([]byte, 0, 1+len(chunk))
+	container = append(container, 0x01)
+	container = append(container, chunk...)
 	input := append([]byte{0xAA, 0xBB, 0xCC}, container...)
 
 	out, strategy, err := DecompressContainerWithFallback(input, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback: %v", err)
 	}
+
 	if strategy != StrategySkipPrefix {
 		t.Fatalf("strategy = %q, want %q", strategy, StrategySkipPrefix)
 	}
+
 	if string(out) != "ok" {
 		t.Fatalf("out = %q, want %q", string(out), "ok")
 	}
@@ -156,13 +170,16 @@ func TestDecompressContainerWithFallbackSkipPrefix(t *testing.T) {
 
 func TestDecompressContainerWithFallbackRaw(t *testing.T) {
 	input := []byte{0xAA, 0xBB, 0xCC}
+
 	out, strategy, err := DecompressContainerWithFallback(input, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback: %v", err)
 	}
+
 	if strategy != StrategyRawPassthru {
 		t.Fatalf("strategy = %q, want %q", strategy, StrategyRawPassthru)
 	}
+
 	if len(out) != len(input) {
 		t.Fatalf("len(out) = %d, want %d", len(out), len(input))
 	}
@@ -170,17 +187,21 @@ func TestDecompressContainerWithFallbackRaw(t *testing.T) {
 
 func TestDecompressContainerWithFallbackVerboseLog(t *testing.T) {
 	// Standard strategy succeeds silently — no log message expected.
-	container := []byte{0x01}
+	container := make([]byte, 1, 32)
+	container[0] = 0x01
 	container = append(container, buildContainerChunk(false, []byte("v"))...)
 
 	stdHandler := &captureHandler{}
+
 	_, strategy, err := DecompressContainerWithFallback(container, slog.New(stdHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback: %v", err)
 	}
+
 	if strategy != StrategyStandard {
 		t.Fatalf("strategy = %q, want %q", strategy, StrategyStandard)
 	}
+
 	if len(stdHandler.records) != 0 {
 		t.Fatalf("standard strategy should not log, got %d record(s)", len(stdHandler.records))
 	}
@@ -188,13 +209,16 @@ func TestDecompressContainerWithFallbackVerboseLog(t *testing.T) {
 	// Skip-prefix strategy does produce a log message.
 	withPrefix := append([]byte{0x00, 0xFF}, container...) // 2 garbage bytes before the container
 	skipHandler := &captureHandler{}
+
 	_, strategy, err = DecompressContainerWithFallback(withPrefix, slog.New(skipHandler))
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback (skip-prefix): %v", err)
 	}
+
 	if strategy != StrategySkipPrefix {
 		t.Fatalf("strategy = %q, want %q", strategy, StrategySkipPrefix)
 	}
+
 	if len(skipHandler.records) == 0 {
 		t.Fatal("skip-prefix strategy should produce a log record")
 	}
@@ -207,10 +231,12 @@ func TestDirStreamRegressionFromStartMDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadStorageTree: %v", err)
 	}
+
 	required, err := st.RequiredStreams()
 	if err != nil {
 		t.Fatalf("RequiredStreams: %v", err)
 	}
+
 	dirNode := required["dir"]
 	if dirNode == nil || len(dirNode.Data) == 0 {
 		t.Skip("dir stream missing in fixture")
@@ -220,6 +246,7 @@ func TestDirStreamRegressionFromStartMDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecompressContainerWithFallback(dir): %v", err)
 	}
+
 	if len(dec) == 0 {
 		t.Fatal("decompressed dir stream is empty")
 	}
@@ -228,6 +255,7 @@ func TestDirStreamRegressionFromStartMDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseDirRecords: %v", err)
 	}
+
 	if len(info.Modules) != 15 {
 		t.Errorf("modules = %d, want 15", len(info.Modules))
 	}
@@ -236,6 +264,7 @@ func TestDirStreamRegressionFromStartMDB(t *testing.T) {
 		if strings.TrimSpace(module.ModuleName) == "" {
 			t.Errorf("module with empty name: %+v", module)
 		}
+
 		if strings.TrimSpace(module.StreamName) == "" {
 			t.Errorf("module %q has empty StreamName", module.ModuleName)
 		}

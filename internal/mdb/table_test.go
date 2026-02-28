@@ -32,6 +32,7 @@ func TestReadTableDef_MSysObjects(t *testing.T) {
 	}
 
 	found := make(map[string]bool)
+
 	for _, col := range td.Columns {
 		if wantType, ok := wantCols[col.Name]; ok {
 			found[col.Name] = true
@@ -48,6 +49,7 @@ func TestReadTableDef_MSysObjects(t *testing.T) {
 	}
 
 	t.Logf("MSysObjects: %d rows, %d columns:", td.NumRows, len(td.Columns))
+
 	for _, col := range td.Columns {
 		t.Logf("  %-20s %-10s len=%-5d fixed=%v", col.Name, ColTypeName(col.Type), col.Length, col.IsFixed())
 	}

@@ -72,6 +72,7 @@ func TestDataPages_MSysObjects(t *testing.T) {
 			t.Errorf("ReadPage(%d): %v", p, err)
 			continue
 		}
+
 		if PageType(page) != PageTypeData {
 			t.Errorf("page %d type = %#x, want data (%#x)", p, PageType(page), PageTypeData)
 		}

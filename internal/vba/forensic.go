@@ -11,11 +11,11 @@ import (
 type ForensicKind string
 
 const (
-	ForensicProjectText    ForensicKind = "project-text"     // parsed as a PROJECT stream
-	ForensicDirRecords     ForensicKind = "dir-records"      // parsed as a dir stream
-	ForensicVBASourceText  ForensicKind = "vba-source-text"  // plaintext VBA source
-	ForensicCompressedVBA  ForensicKind = "compressed-vba"   // decompresses to VBA source
-	ForensicAccessArtifact ForensicKind = "access-artifact"  // known Access structural text
+	ForensicProjectText    ForensicKind = "project-text"    // parsed as a PROJECT stream
+	ForensicDirRecords     ForensicKind = "dir-records"     // parsed as a dir stream
+	ForensicVBASourceText  ForensicKind = "vba-source-text" // plaintext VBA source
+	ForensicCompressedVBA  ForensicKind = "compressed-vba"  // decompresses to VBA source
+	ForensicAccessArtifact ForensicKind = "access-artifact" // known Access structural text
 )
 
 // ForensicHit describes a single storage node that may contain VBA data.
@@ -115,6 +115,7 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 
 		if isLikelyAccessArtifactNode(node.Name) {
 			artifactText := decodeBestText(data)
+
 			score := scoreAccessArtifactText(artifactText)
 			if score >= 5 {
 				report.ArtifactCandidates++
@@ -136,8 +137,10 @@ func ForensicScanStorage(st *StorageTree) ForensicReport {
 			if report.Hits[i].NodeID == report.Hits[j].NodeID {
 				return report.Hits[i].Kind < report.Hits[j].Kind
 			}
+
 			return report.Hits[i].NodeID < report.Hits[j].NodeID
 		}
+
 		return report.Hits[i].Score > report.Hits[j].Score
 	})
 
@@ -149,13 +152,16 @@ func summarizeText(text string) string {
 	if text == "" {
 		return ""
 	}
+
 	line := text
 	if idx := strings.Index(line, "\n"); idx >= 0 {
 		line = line[:idx]
 	}
+
 	if len(line) > 100 {
 		line = line[:100] + "..."
 	}
+
 	return line
 }
 
@@ -179,11 +185,13 @@ func scoreAccessArtifactText(text string) int {
 	}
 
 	printable := 0
+
 	for _, r := range text {
 		if r == '\n' || r == '\r' || r == '\t' || (r >= 32 && r <= 126) || (r >= 160 && r <= 255) {
 			printable++
 		}
 	}
+
 	if len(text) > 0 {
 		ratio := float64(printable) / float64(len(text))
 		if ratio > 0.90 {

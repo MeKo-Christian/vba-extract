@@ -8,11 +8,11 @@ Access databases embed VBA projects as compressed binary streams inside the data
 
 It handles two classes of database:
 
-| Situation | How it's handled |
-|---|---|
-| Standard VBA project (`MSysAccessStorage` intact) | Reads PROJECT + dir streams, extracts each module |
+| Situation                                                      | How it's handled                                             |
+| -------------------------------------------------------------- | ------------------------------------------------------------ |
+| Standard VBA project (`MSysAccessStorage` intact)              | Reads PROJECT + dir streams, extracts each module            |
 | Stripped project (system tables removed but page data on disk) | Two-pass LVAL chain scanner recovers orphaned module streams |
-| No VBA at all (pure data database) | Reports `modules=0`, no error |
+| No VBA at all (pure data database)                             | Reports `modules=0`, no error                                |
 
 ## Installation
 
@@ -105,11 +105,11 @@ Use `--output-dir` to specify the root directory, and `--flat` to skip the per-d
 
 ## Supported formats
 
-| Format | Extension | Engine |
-|---|---|---|
-| Access 2000 – 2003 | `.mdb` | Jet 4.0 |
-| Access 2007 – 2019+ | `.accdb` | ACE |
-| Access 97 | `.mdb` | Jet 3.5 (partial) |
+| Format              | Extension | Engine            |
+| ------------------- | --------- | ----------------- |
+| Access 2000 – 2003  | `.mdb`    | Jet 4.0           |
+| Access 2007 – 2019+ | `.accdb`  | ACE               |
+| Access 97           | `.mdb`    | Jet 3.5 (partial) |
 
 ## How forensic recovery works
 

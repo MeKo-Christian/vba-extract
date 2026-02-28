@@ -3,6 +3,7 @@ package vba
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -35,7 +36,7 @@ type ProjectInfo struct {
 // ParseProjectStream parses Access PROJECT stream text (latin-1 encoded).
 func ParseProjectStream(data []byte) (*ProjectInfo, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("vba: PROJECT stream is empty")
+		return nil, errors.New("vba: PROJECT stream is empty")
 	}
 
 	decoded, err := charmap.ISO8859_1.NewDecoder().Bytes(data)
@@ -77,6 +78,7 @@ func ParseProjectStream(data []byte) (*ProjectInfo, error) {
 			if idx := strings.Index(name, "/"); idx >= 0 {
 				name = name[:idx]
 			}
+
 			info.Modules = append(info.Modules, ProjectModule{Name: strings.TrimSpace(name), Type: ProjectModuleDocument})
 		default:
 			if strings.EqualFold(section, "Host Extender Info") {
@@ -84,6 +86,7 @@ func ParseProjectStream(data []byte) (*ProjectInfo, error) {
 			} else {
 				info.Metadata[key] = value
 			}
+
 			if strings.EqualFold(key, "Name") && info.Name == "" {
 				info.Name = stripQuotes(value)
 			}
@@ -103,6 +106,7 @@ func stripQuotes(s string) string {
 	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
 		return s[1 : len(s)-1]
 	}
+
 	return s
 }
 
@@ -114,6 +118,7 @@ func splitKV(line string) (key string, value string, ok bool) {
 
 	key = strings.TrimSpace(line[:idx])
 	value = strings.TrimSpace(line[idx+1:])
+
 	if key == "" {
 		return "", "", false
 	}

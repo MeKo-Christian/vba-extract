@@ -2,6 +2,7 @@ package mdb
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -11,8 +12,8 @@ import (
 const (
 	dataFreeSpace = 0x02
 	dataTDefPage  = 0x04
-	dataNumRows  = 0x0C
-	dataRowTable = 0x0E // row offset table starts here (Jet4: 2 bytes per entry)
+	dataNumRows   = 0x0C
+	dataRowTable  = 0x0E // row offset table starts here (Jet4: 2 bytes per entry)
 
 	// Row offset flags.
 	rowDeleteFlag = 0x8000
@@ -21,7 +22,7 @@ const (
 )
 
 // Row represents a single parsed table row. Values are keyed by column name.
-type Row map[string]interface{}
+type Row map[string]any
 
 // DataPages returns the list of data page numbers for this table.
 // It scans all database pages to find data pages belonging to this table.
@@ -34,17 +35,19 @@ func (td *TableDef) DataPages() ([]int64, error) {
 		if err != nil {
 			continue
 		}
+
 		if buf[0] != PageTypeData {
 			continue
 		}
+
 		tdefPg := binary.LittleEndian.Uint32(buf[dataTDefPage:])
 		if int64(tdefPg) == td.DefPage {
 			pages = append(pages, i)
 		}
 	}
+
 	return pages, nil
 }
-
 
 // ReadRows reads all non-deleted rows from this table.
 func (td *TableDef) ReadRows() ([]Row, error) {
@@ -61,6 +64,7 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 	})
 
 	var rows []Row
+
 	for _, pageNum := range dataPages {
 		page, err := td.db.ReadPage(pageNum)
 		if err != nil {
@@ -84,12 +88,14 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 			if rowOff+2 > PageSize {
 				break
 			}
+
 			offVal := binary.LittleEndian.Uint16(page[rowOff:])
 
 			// Check delete/lookup flags.
 			if offVal&rowDeleteFlag != 0 {
 				continue
 			}
+
 			if offVal&rowLookupFlag != 0 {
 				// Overflow row pointer — skip for now.
 				continue
@@ -114,13 +120,16 @@ func (td *TableDef) ReadRows() ([]Row, error) {
 			}
 
 			rowData := page[offset:rowEnd]
+
 			row, err := td.parseRow(rowData, sortedCols)
 			if err != nil {
 				continue // skip malformed rows
 			}
+
 			rows = append(rows, row)
 		}
 	}
+
 	return rows, nil
 }
 
@@ -138,30 +147,34 @@ func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
 	// num_cols at the START of the row (2 bytes, Jet4).
 	numCols := int(binary.LittleEndian.Uint16(data[0:2]))
 	if numCols <= 0 {
-		return nil, fmt.Errorf("mdb: row has 0 columns")
+		return nil, errors.New("mdb: row has 0 columns")
 	}
 
 	// null_mask at the END of the row (ceil(numCols/8) bytes).
 	nullMaskLen := (numCols + 7) / 8
+
 	pos := len(data) - nullMaskLen
 	if pos < 2 {
-		return nil, fmt.Errorf("mdb: row too short for null mask")
+		return nil, errors.New("mdb: row too short for null mask")
 	}
+
 	nullMask := data[pos : pos+nullMaskLen]
 
 	// num_var_cols (2 bytes) immediately before null_mask.
 	pos -= 2
 	if pos < 2 {
-		return nil, fmt.Errorf("mdb: row too short for num_var_cols")
+		return nil, errors.New("mdb: row too short for num_var_cols")
 	}
+
 	numVarCols := int(binary.LittleEndian.Uint16(data[pos:]))
 
 	// var_offset_table: (numVarCols+1) entries of 2 bytes each, before num_var_cols.
 	// Stored in reverse order: last entry = offset of first var column start.
 	numVarOffsets := numVarCols + 1
+
 	pos -= numVarOffsets * 2
 	if pos < 2 {
-		return nil, fmt.Errorf("mdb: row too short for var_offset_table")
+		return nil, errors.New("mdb: row too short for var_offset_table")
 	}
 	// Read the offset table and reverse it so index 0 = first var column boundary.
 	varOffsets := make([]int, numVarOffsets)
@@ -178,6 +191,7 @@ func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
 		// Check null bit. Bit=1 means NOT NULL.
 		if colIdx < numCols {
 			byteIdx := colIdx / 8
+
 			bitIdx := uint(colIdx % 8)
 			if byteIdx < len(nullMask) && nullMask[byteIdx]&(1<<bitIdx) == 0 {
 				row[col.Name] = nil
@@ -200,7 +214,7 @@ func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
 
 // readFixedColumn reads a fixed-length column value from row data.
 // baseOff is the offset where fixed data begins (2 for Jet4, after num_cols).
-func readFixedColumn(data []byte, col *Column, baseOff int) interface{} {
+func readFixedColumn(data []byte, col *Column, baseOff int) any {
 	off := baseOff + int(col.OffsetFix)
 	if off >= len(data) {
 		return nil
@@ -215,29 +229,32 @@ func readFixedColumn(data []byte, col *Column, baseOff int) interface{} {
 		if off+2 > len(data) {
 			return nil
 		}
+
 		return int16(binary.LittleEndian.Uint16(data[off:]))
 	case ColTypeLong:
 		if off+4 > len(data) {
 			return nil
 		}
+
 		return int32(binary.LittleEndian.Uint32(data[off:]))
 	case ColTypeFloat:
 		if off+4 > len(data) {
 			return nil
 		}
+
 		return math.Float32frombits(binary.LittleEndian.Uint32(data[off:]))
 	case ColTypeDouble, ColTypeDatetime, ColTypeMoney:
 		if off+8 > len(data) {
 			return nil
 		}
+
 		return math.Float64frombits(binary.LittleEndian.Uint64(data[off:]))
 	default:
-		end := off + int(col.Length)
-		if end > len(data) {
-			end = len(data)
-		}
+		end := min(off+int(col.Length), len(data))
+
 		result := make([]byte, end-off)
 		copy(result, data[off:end])
+
 		return result
 	}
 }
@@ -245,7 +262,7 @@ func readFixedColumn(data []byte, col *Column, baseOff int) interface{} {
 // readVarColumn reads a variable-length column value from row data.
 // varOffsets is the reversed offset table (index 0 = first var column boundary).
 // numVarCols is the number of variable columns stored in this row.
-func readVarColumn(data []byte, col *Column, varOffsets []int, numVarCols int) interface{} {
+func readVarColumn(data []byte, col *Column, varOffsets []int, numVarCols int) any {
 	idx := int(col.OffsetVar)
 	if idx >= numVarCols || idx+1 >= len(varOffsets) {
 		return nil
@@ -267,39 +284,47 @@ func readVarColumn(data []byte, col *Column, varOffsets []int, numVarCols int) i
 		if len(raw) >= 1 {
 			return raw[0] != 0
 		}
+
 		return nil
 	case ColTypeByte:
 		if len(raw) >= 1 {
 			return raw[0]
 		}
+
 		return nil
 	case ColTypeInt:
 		if len(raw) >= 2 {
 			return int16(binary.LittleEndian.Uint16(raw))
 		}
+
 		return nil
 	case ColTypeLong:
 		if len(raw) >= 4 {
 			return int32(binary.LittleEndian.Uint32(raw))
 		}
+
 		return nil
 	case ColTypeFloat:
 		if len(raw) >= 4 {
 			return math.Float32frombits(binary.LittleEndian.Uint32(raw))
 		}
+
 		return nil
 	case ColTypeDouble, ColTypeDatetime, ColTypeMoney:
 		if len(raw) >= 8 {
 			return math.Float64frombits(binary.LittleEndian.Uint64(raw))
 		}
+
 		return nil
 	case ColTypeMemo, ColTypeOLE:
 		result := make([]byte, len(raw))
 		copy(result, raw)
+
 		return result
 	default:
 		result := make([]byte, len(raw))
 		copy(result, raw)
+
 		return result
 	}
 }

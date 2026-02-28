@@ -9,14 +9,19 @@ const testMDB = "../../testdata/Start.mdb"
 
 func testDB(t *testing.T) *Database {
 	t.Helper()
-	if _, err := os.Stat(testMDB); os.IsNotExist(err) {
+
+	_, err := os.Stat(testMDB)
+	if os.IsNotExist(err) {
 		t.Skip("testdata/Start.mdb not available")
 	}
+
 	db, err := Open(testMDB)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { db.Close() })
+
 	return db
 }
 
@@ -50,6 +55,7 @@ func TestReadPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPage(0): %v", err)
 	}
+
 	if PageType(page0) != PageTypeDB {
 		t.Errorf("Page 0 type = %#x, want %#x", PageType(page0), PageTypeDB)
 	}
@@ -59,6 +65,7 @@ func TestReadPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPage(2): %v", err)
 	}
+
 	if PageType(page2) != PageTypeTDEF {
 		t.Errorf("Page 2 type = %#x, want %#x (TDEF)", PageType(page2), PageTypeTDEF)
 	}
@@ -83,8 +90,16 @@ func TestOpenInvalidFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmp.Name())
-	tmp.Write([]byte("tiny"))
-	tmp.Close()
+
+	_, err = tmp.WriteString("tiny")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tmp.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = Open(tmp.Name())
 	if err == nil {

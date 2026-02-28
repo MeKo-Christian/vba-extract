@@ -2,6 +2,7 @@ package vba
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -25,8 +26,9 @@ var bitCountLUT = buildBitCountLUT()
 // MS-OVBA §2.4.1.
 func DecompressContainer(data []byte) ([]byte, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("vba: empty compressed container")
+		return nil, errors.New("vba: empty compressed container")
 	}
+
 	if data[0] != compressedContainerSig {
 		return nil, fmt.Errorf("vba: invalid compressed container signature %#x", data[0])
 	}
@@ -48,6 +50,7 @@ func DecompressContainer(data []byte) ([]byte, error) {
 		}
 
 		compressed := (header & 0x8000) != 0
+
 		chunkSize := int(header&0x0FFF) + 3 // includes 2-byte header
 		if chunkSize < 3 {
 			return nil, fmt.Errorf("vba: invalid chunk size %d", chunkSize)
@@ -70,6 +73,7 @@ func DecompressContainer(data []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		out = append(out, chunkOut...)
 	}
 
@@ -85,7 +89,7 @@ func DecompressContainer(data []byte) ([]byte, error) {
 // Pass slog.New(slog.DiscardHandler) to suppress all output.
 func DecompressContainerWithFallback(data []byte, log *slog.Logger) ([]byte, DecompressionStrategy, error) {
 	if len(data) == 0 {
-		return nil, "", fmt.Errorf("vba: empty input for decompression fallback")
+		return nil, "", errors.New("vba: empty input for decompression fallback")
 	}
 
 	out, err := DecompressContainer(data)
@@ -106,12 +110,14 @@ func DecompressContainerWithFallback(data []byte, log *slog.Logger) ([]byte, Dec
 		}
 
 		log.Debug("vba: decompression used skip-prefix strategy", "strategy", StrategySkipPrefix, "offset", i)
+
 		return out, StrategySkipPrefix, nil
 	}
 
 	raw := make([]byte, len(data))
 	copy(raw, data)
 	log.Debug("vba: decompression used raw-passthrough strategy", "strategy", StrategyRawPassthru)
+
 	return raw, StrategyRawPassthru, nil
 }
 
@@ -123,7 +129,7 @@ func decompressChunk(payload []byte) ([]byte, error) {
 		flags := payload[pos]
 		pos++
 
-		for bit := 0; bit < 8; bit++ {
+		for bit := range 8 {
 			if pos >= len(payload) {
 				break
 			}
@@ -132,14 +138,16 @@ func decompressChunk(payload []byte) ([]byte, error) {
 			if !isCopy {
 				out = append(out, payload[pos])
 				pos++
+
 				if len(out) > maxChunkDecompressed {
 					return nil, fmt.Errorf("vba: decompressed chunk exceeds %d bytes", maxChunkDecompressed)
 				}
+
 				continue
 			}
 
 			if pos+2 > len(payload) {
-				return nil, fmt.Errorf("vba: truncated copy token in compressed chunk")
+				return nil, errors.New("vba: truncated copy token in compressed chunk")
 			}
 
 			token := binary.LittleEndian.Uint16(payload[pos : pos+2])
@@ -156,8 +164,9 @@ func decompressChunk(payload []byte) ([]byte, error) {
 				return nil, fmt.Errorf("vba: invalid copy offset %d for decompressed length %d", offset, len(out))
 			}
 
-			for i := 0; i < length; i++ {
+			for range length {
 				src := len(out) - offset
+
 				out = append(out, out[src])
 				if len(out) > maxChunkDecompressed {
 					return nil, fmt.Errorf("vba: decompressed chunk exceeds %d bytes", maxChunkDecompressed)
@@ -173,9 +182,11 @@ func bitCountForDecompressedPos(pos int) int {
 	if pos < 0 {
 		return 4
 	}
+
 	if pos >= len(bitCountLUT) {
 		return 12
 	}
+
 	return bitCountLUT[pos]
 }
 
@@ -203,5 +214,6 @@ func buildBitCountLUT() []int {
 			lut[i] = 12
 		}
 	}
+
 	return lut
 }

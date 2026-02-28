@@ -3,14 +3,17 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/MeKo-Tech/vba-extract/internal/mdb"
 	"github.com/MeKo-Tech/vba-extract/internal/vba"
 	"github.com/spf13/cobra"
 )
 
-var infoShowTree bool
-var infoForensic bool
+var (
+	infoShowTree bool
+	infoForensic bool
+)
 
 var infoCmd = &cobra.Command{
 	Use:   "info [file]",
@@ -79,41 +82,65 @@ func printStorageTree(st *vba.StorageTree) {
 	}
 
 	fmt.Println("storageTree:")
+
 	visited := map[int32]bool{}
 	var walk func(node *vba.StorageNode, depth int)
 	walk = func(node *vba.StorageNode, depth int) {
 		if node == nil {
 			return
 		}
+
 		if depth > 20 {
 			indent := ""
-			for i := 0; i < depth; i++ {
-				indent += "  "
+
+			var indentSb92 strings.Builder
+			for range depth {
+				indentSb92.WriteString("  ")
 			}
+
+			indent += indentSb92.String()
+
 			fmt.Printf("%s- ... (depth limit reached)\n", indent)
+
 			return
 		}
+
 		if visited[node.ID] {
 			indent := ""
-			for i := 0; i < depth; i++ {
-				indent += "  "
+
+			var indentSb100 strings.Builder
+			for range depth {
+				indentSb100.WriteString("  ")
 			}
+
+			indent += indentSb100.String()
+
 			fmt.Printf("%s- %s (id=%d) [cycle]\n", indent, node.Name, node.ID)
+
 			return
 		}
+
 		visited[node.ID] = true
 
 		indent := ""
-		for i := 0; i < depth; i++ {
-			indent += "  "
+
+		var indentSb109 strings.Builder
+		for range depth {
+			indentSb109.WriteString("  ")
 		}
+
+		indent += indentSb109.String()
+
 		fmt.Printf("%s- %s (id=%d type=%d data=%d)\n", indent, node.Name, node.ID, node.Type, len(node.Data))
+
 		for _, child := range st.Children[node.ID] {
 			if child != nil && child.ID == node.ID {
 				continue
 			}
+
 			walk(child, depth+1)
 		}
+
 		visited[node.ID] = false
 	}
 
@@ -122,16 +149,14 @@ func printStorageTree(st *vba.StorageTree) {
 
 func printForensic(st *vba.StorageTree) {
 	report := vba.ForensicScanStorage(st)
+
 	fmt.Println("forensic:")
 	fmt.Printf("  hits=%d projectCandidates=%d dirCandidates=%d sourceCandidates=%d compressedCandidates=%d artifactCandidates=%d\n",
 		len(report.Hits), report.ProjectCandidates, report.DirCandidates, report.SourceCandidates, report.CompressedCandidates, report.ArtifactCandidates)
 
-	limit := len(report.Hits)
-	if limit > 25 {
-		limit = 25
-	}
+	limit := min(len(report.Hits), 25)
 
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		h := report.Hits[i]
 		fmt.Printf("  - id=%d name=%q type=%d size=%d kind=%s score=%d :: %s\n",
 			h.NodeID, h.NodeName, h.NodeType, h.DataSize, h.Kind, h.Score, h.Summary)

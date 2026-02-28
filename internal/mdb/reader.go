@@ -105,6 +105,7 @@ func (db *Database) parseHeader() error {
 	// Validate magic bytes.
 	var magic [4]byte
 	copy(magic[:], page[offsetMagic:offsetMagic+4])
+
 	if magic != magicBytes {
 		return fmt.Errorf("mdb: invalid magic bytes: %x", magic)
 	}
@@ -114,6 +115,7 @@ func (db *Database) parseHeader() error {
 	for nameEnd < offsetDBName+16 && page[nameEnd] != 0 {
 		nameEnd++
 	}
+
 	db.Header.DBName = string(page[offsetDBName:nameEnd])
 
 	db.Header.JetVersion = binary.LittleEndian.Uint32(page[offsetJetVersion:])
@@ -134,11 +136,14 @@ func (db *Database) ReadPage(pageNum int64) ([]byte, error) {
 	if pageNum < 0 || pageNum >= db.pageCount {
 		return nil, fmt.Errorf("mdb: page %d out of range (0..%d)", pageNum, db.pageCount-1)
 	}
+
 	page := make([]byte, PageSize)
+
 	_, err := db.f.ReadAt(page, pageNum*PageSize)
 	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("mdb: read page %d: %w", pageNum, err)
 	}
+
 	return page, nil
 }
 

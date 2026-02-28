@@ -12,7 +12,6 @@ const (
 	LvalMultiPage = 0x00 // data spans multiple LVAL page records
 )
 
-
 // ResolveMemo resolves a MEMO/OLE field reference to its full data.
 // The raw bytes from the variable column area contain a 12-byte reference (Jet4).
 func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
@@ -25,6 +24,7 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 	if len(raw) < 12 {
 		result := make([]byte, len(raw))
 		copy(result, raw)
+
 		return result, nil
 	}
 
@@ -43,31 +43,37 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 		if len(data) > memoLen {
 			data = data[:memoLen]
 		}
+
 		result := make([]byte, len(data))
 		copy(result, data)
+
 		return result, nil
 
 	case LvalSingle:
 		// Data is in a single LVAL page record.
 		lvalPage := binary.LittleEndian.Uint32(raw[4:8])
-		rowID := int(lvalPage & 0xFF)        // low byte = row ID
-		pageNum := int64(lvalPage >> 8)       // upper 3 bytes = page number
+		rowID := int(lvalPage & 0xFF) // low byte = row ID
+
+		pageNum := int64(lvalPage >> 8) // upper 3 bytes = page number
 		if pageNum == 0 {
 			// Alternative encoding: full uint32 page, separate row
 			pageNum = int64(binary.LittleEndian.Uint32(raw[4:8]))
 			rowID = 0
 		}
+
 		return db.readLvalRecord(pageNum, rowID, memoLen)
 
 	case LvalMultiPage:
 		// Data spans multiple LVAL pages.
 		lvalPage := binary.LittleEndian.Uint32(raw[4:8])
 		rowID := int(lvalPage & 0xFF)
+
 		pageNum := int64(lvalPage >> 8)
 		if pageNum == 0 {
 			pageNum = int64(binary.LittleEndian.Uint32(raw[4:8]))
 			rowID = 0
 		}
+
 		return db.readLvalChain(pageNum, rowID, memoLen)
 
 	default:
@@ -76,8 +82,10 @@ func (db *Database) ResolveMemo(raw []byte) ([]byte, error) {
 			data := raw[12 : 12+memoLen]
 			result := make([]byte, len(data))
 			copy(result, data)
+
 			return result, nil
 		}
+
 		return nil, fmt.Errorf("mdb: unknown LVAL bitmask %#x", bitmask)
 	}
 }
@@ -123,6 +131,7 @@ func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte
 
 	result := make([]byte, len(data))
 	copy(result, data)
+
 	return result, nil
 }
 
@@ -133,6 +142,7 @@ func (db *Database) ReadLvalChain(pageNum int64, rowID int, maxLen int) ([]byte,
 	if effective <= 0 {
 		effective = 1<<31 - 1 // 2GB cap
 	}
+
 	return db.readLvalChain(pageNum, rowID, effective)
 }
 
@@ -177,6 +187,7 @@ func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byt
 		if len(recordData) < 4 {
 			break
 		}
+
 		nextPtr := binary.LittleEndian.Uint32(recordData[0:4])
 		nextPage := int64(nextPtr >> 8)
 		nextRow := int(nextPtr & 0xFF)

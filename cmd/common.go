@@ -49,22 +49,28 @@ func discoverInputFiles(args []string, recursive bool) ([]string, error) {
 				if !recursive {
 					continue
 				}
+
 				err = filepath.WalkDir(candidate, func(path string, d os.DirEntry, walkErr error) error {
 					if walkErr != nil {
 						return walkErr
 					}
+
 					if d.IsDir() {
 						return nil
 					}
+
 					if !isAccessFile(path) {
 						return nil
 					}
+
 					addUniquePath(path, seen, &files)
+
 					return nil
 				})
 				if err != nil {
 					return nil, fmt.Errorf("walk %q: %w", candidate, err)
 				}
+
 				continue
 			}
 
@@ -75,6 +81,7 @@ func discoverInputFiles(args []string, recursive bool) ([]string, error) {
 	}
 
 	sort.Strings(files)
+
 	return files, nil
 }
 
@@ -84,11 +91,14 @@ func expandArg(arg string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("glob %q: %w", arg, err)
 		}
+
 		if len(matches) == 0 {
 			return nil, fmt.Errorf("glob %q matched no files", arg)
 		}
+
 		return matches, nil
 	}
+
 	return []string{arg}, nil
 }
 
@@ -101,9 +111,11 @@ func addUniquePath(path string, seen map[string]struct{}, files *[]string) {
 	if err != nil {
 		abs = path
 	}
+
 	if _, ok := seen[abs]; ok {
 		return
 	}
+
 	seen[abs] = struct{}{}
 	*files = append(*files, abs)
 }
@@ -124,6 +136,7 @@ func loadModules(path string) ([]vba.ExtractedModule, error) {
 	st, stErr := vba.LoadStorageTree(db)
 
 	var modules []vba.ExtractedModule
+
 	var extractErr error
 	if stErr == nil {
 		modules, extractErr = vba.ExtractAllModules(st, log)
@@ -141,6 +154,7 @@ func loadModules(path string) ([]vba.ExtractedModule, error) {
 	if scanErr == nil && len(scanned) > 0 {
 		log.Debug("vba: standard extraction failed; recovered modules via raw LVAL scan",
 			"err", extractErr, "count", len(scanned))
+
 		return scanned, nil
 	}
 
@@ -152,9 +166,11 @@ func loadModules(path string) ([]vba.ExtractedModule, error) {
 		log.Debug("vba: no VBA found", "path", path, "err", extractErr)
 		return nil, nil
 	}
+
 	if extractErr != nil {
 		return nil, fmt.Errorf("extract modules %q: %w", path, extractErr)
 	}
+
 	return modules, nil
 }
 
@@ -162,6 +178,7 @@ func moduleExt(moduleType vba.ProjectModuleType) string {
 	if moduleType == vba.ProjectModuleClass || moduleType == vba.ProjectModuleDocument {
 		return ".cls"
 	}
+
 	return ".bas"
 }
 
@@ -170,29 +187,38 @@ func safeModuleName(name string) string {
 	if name == "" {
 		return "unnamed"
 	}
+
 	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+
 	return replacer.Replace(name)
 }
 
 func writeModules(baseOutDir, dbPath string, modules []vba.ExtractedModule, flat bool) (int, int, error) {
 	dbName := strings.TrimSuffix(filepath.Base(dbPath), filepath.Ext(dbPath))
+
 	targetDir := baseOutDir
 	if !flat {
 		targetDir = filepath.Join(baseOutDir, dbName)
 	}
 
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+	err := os.MkdirAll(targetDir, 0o755)
+	if err != nil {
 		return 0, 0, fmt.Errorf("create output dir %q: %w", targetDir, err)
 	}
 
 	written := 0
 	totalLines := 0
+
 	for _, module := range modules {
 		filename := safeModuleName(module.Name) + moduleExt(module.Type)
+
 		outPath := filepath.Join(targetDir, filename)
-		if err := os.WriteFile(outPath, []byte(module.Text), 0o644); err != nil {
+
+		err := os.WriteFile(outPath, []byte(module.Text), 0o644)
+		if err != nil {
 			return written, totalLines, fmt.Errorf("write %q: %w", outPath, err)
 		}
+
 		written++
 		totalLines += strings.Count(module.Text, "\n")
 	}
@@ -211,6 +237,7 @@ func computeFileHash(path string) (string, error) {
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
+
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
@@ -218,11 +245,13 @@ func defaultOutputDir() string {
 	if outputDir != "" {
 		return outputDir
 	}
+
 	return filepath.Join(".", "vba-output")
 }
 
 func printListTable(entries []listEntry) {
 	fmt.Printf("%-30s %-10s %-30s %-8s %-7s\n", "MODULE", "TYPE", "STREAM", "BYTES", "PARTIAL")
+
 	for _, e := range entries {
 		fmt.Printf("%-30s %-10s %-30s %-8d %-7v\n", e.Name, e.Type, e.Stream, e.SizeBytes, e.Partial)
 	}
@@ -233,7 +262,9 @@ func printListJSON(entries []listEntry) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Println(string(b))
+
 	return nil
 }
 
@@ -242,6 +273,7 @@ func colorEnabled() bool {
 	if err != nil {
 		return false
 	}
+
 	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
@@ -249,5 +281,6 @@ func colorize(code, text string) string {
 	if !colorEnabled() {
 		return text
 	}
+
 	return "\x1b[" + code + "m" + text + "\x1b[0m"
 }

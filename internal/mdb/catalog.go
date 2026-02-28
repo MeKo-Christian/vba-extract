@@ -38,21 +38,26 @@ func (db *Database) Catalog() ([]CatalogEntry, error) {
 	}
 
 	var entries []CatalogEntry
+
 	for _, row := range rows {
 		e := CatalogEntry{}
 
 		if v, ok := row["Id"].(int32); ok {
 			e.ID = v
 		}
+
 		if v, ok := row["ParentId"].(int32); ok {
 			e.ParentID = v
 		}
+
 		if v, ok := row["Name"].(string); ok {
 			e.Name = v
 		}
+
 		if v, ok := row["Type"].(int16); ok {
 			e.Type = v
 		}
+
 		if v, ok := row["Flags"].(int32); ok {
 			e.Flags = v
 		}
@@ -90,10 +95,12 @@ func (db *Database) TableNames() ([]string, error) {
 	}
 
 	var names []string
+
 	for _, e := range entries {
 		if e.Type == ObjTypeLocalTable {
 			names = append(names, e.Name)
 		}
 	}
+
 	return names, nil
 }

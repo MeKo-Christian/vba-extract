@@ -157,11 +157,14 @@ func (db *Database) ReadTableDef(tdefPage int64) (*TableDef, error) {
 		if nameOff+2 > len(tdefData) {
 			return nil, fmt.Errorf("mdb: TDEF at page %d: name data truncated at column %d", tdefPage, i)
 		}
+
 		nameLen := int(binary.LittleEndian.Uint16(tdefData[nameOff:]))
+
 		nameOff += 2
 		if nameOff+nameLen > len(tdefData) {
 			return nil, fmt.Errorf("mdb: TDEF at page %d: name %d extends past TDEF", tdefPage, i)
 		}
+
 		td.Columns[i].Name = decodeUCS2(tdefData[nameOff : nameOff+nameLen])
 		nameOff += nameLen
 	}
@@ -179,6 +182,7 @@ func (db *Database) readTDEFPages(startPage int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if PageType(page) != PageTypeTDEF {
 		return nil, fmt.Errorf("mdb: page %d is type %#x, not TDEF (%#x)", startPage, PageType(page), PageTypeTDEF)
 	}
@@ -210,10 +214,12 @@ func decodeUCS2(b []byte) string {
 	if len(b)%2 != 0 {
 		b = b[:len(b)-1]
 	}
+
 	u16 := make([]uint16, len(b)/2)
 	for i := range u16 {
 		u16[i] = binary.LittleEndian.Uint16(b[i*2:])
 	}
+
 	return string(utf16.Decode(u16))
 }
 

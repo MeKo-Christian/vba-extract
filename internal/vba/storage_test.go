@@ -11,6 +11,7 @@ const testMDB = "../../testdata/Start.mdb"
 
 func testDB(t *testing.T) *mdb.Database {
 	t.Helper()
+
 	if _, err := os.Stat(testMDB); os.IsNotExist(err) {
 		t.Skip("testdata/Start.mdb not available")
 	}
@@ -19,6 +20,7 @@ func testDB(t *testing.T) *mdb.Database {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	return db
@@ -89,6 +91,7 @@ func TestModuleStreamsHaveData(t *testing.T) {
 	}
 
 	nonEmpty := 0
+
 	for _, module := range modules {
 		if len(module.Data) > 0 {
 			nonEmpty++

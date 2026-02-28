@@ -4,6 +4,7 @@ import "testing"
 
 func TestForensicScanStorageStartMDB(t *testing.T) {
 	db := testDB(t)
+
 	st, err := LoadStorageTree(db)
 	if err != nil {
 		t.Fatalf("LoadStorageTree: %v", err)
@@ -13,9 +14,11 @@ func TestForensicScanStorageStartMDB(t *testing.T) {
 	if len(report.Hits) == 0 {
 		t.Fatal("forensic scan returned no hits")
 	}
+
 	if report.ProjectCandidates == 0 {
 		t.Fatal("expected at least one project candidate")
 	}
+
 	if report.DirCandidates == 0 {
 		t.Fatal("expected at least one dir candidate")
 	}
@@ -23,7 +26,7 @@ func TestForensicScanStorageStartMDB(t *testing.T) {
 
 func TestSubtreeCycleSafe(t *testing.T) {
 	st := &StorageTree{
-		ByID: map[int32]*StorageNode{},
+		ByID:     map[int32]*StorageNode{},
 		Children: map[int32][]*StorageNode{},
 	}
 
@@ -55,12 +58,14 @@ func TestForensicDetectsAccessArtifacts(t *testing.T) {
 	}
 
 	found := false
+
 	for _, hit := range report.Hits {
 		if hit.Kind == ForensicAccessArtifact {
 			found = true
 			break
 		}
 	}
+
 	if !found {
 		t.Fatal("artifact hit kind not present in report")
 	}

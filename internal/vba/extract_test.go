@@ -19,9 +19,11 @@ func TestCleanupVBA(t *testing.T) {
 	if strings.Contains(out, "\r") {
 		t.Fatalf("cleanupVBA should normalize CRLF to LF: %q", out)
 	}
+
 	if !strings.HasSuffix(out, "\n") {
 		t.Fatalf("cleanupVBA should end with newline: %q", out)
 	}
+
 	if strings.Contains(out, "\x00") {
 		t.Fatalf("cleanupVBA should trim trailing NUL bytes: %q", out)
 	}
@@ -29,13 +31,16 @@ func TestCleanupVBA(t *testing.T) {
 
 func TestRecoverPartialText(t *testing.T) {
 	raw := []byte("\x00\x01garbage\nSub Test()\nMsgBox \"x\"\nmore\n")
+
 	partial, ok := recoverPartialText(raw)
 	if !ok {
 		t.Fatal("expected partial recovery")
 	}
+
 	if !strings.Contains(partial, "[PARTIAL - reconstructed from p-code tokens]") {
 		t.Fatalf("missing partial header: %q", partial)
 	}
+
 	if !strings.Contains(partial, "Sub Test()") {
 		t.Fatalf("expected recovered VBA fragment: %q", partial)
 	}
@@ -43,6 +48,7 @@ func TestRecoverPartialText(t *testing.T) {
 
 func TestExtractAllModulesFromStartMDB(t *testing.T) {
 	db := testDB(t)
+
 	st, err := LoadStorageTree(db)
 	if err != nil {
 		t.Fatalf("LoadStorageTree: %v", err)
@@ -52,16 +58,19 @@ func TestExtractAllModulesFromStartMDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExtractAllModules: %v", err)
 	}
+
 	if len(modules) == 0 {
 		t.Fatal("no modules extracted")
 	}
 
 	hasNamed := false
 	hasSource := false
+
 	for _, module := range modules {
 		if strings.TrimSpace(module.Name) != "" {
 			hasNamed = true
 		}
+
 		if strings.Contains(strings.ToLower(module.Text), "attribute vb_name") {
 			hasSource = true
 			break
@@ -71,6 +80,7 @@ func TestExtractAllModulesFromStartMDB(t *testing.T) {
 	if !hasNamed {
 		t.Fatal("extracted modules have no names")
 	}
+
 	if !hasSource {
 		t.Fatal("no extracted module contains Attribute VB_Name")
 	}
@@ -78,6 +88,7 @@ func TestExtractAllModulesFromStartMDB(t *testing.T) {
 
 func TestExtractAllModulesMatchesExpectedManifest(t *testing.T) {
 	db := testDB(t)
+
 	st, err := LoadStorageTree(db)
 	if err != nil {
 		t.Fatalf("LoadStorageTree: %v", err)
@@ -89,21 +100,25 @@ func TestExtractAllModulesMatchesExpectedManifest(t *testing.T) {
 	}
 
 	expectedPath := filepath.Join("..", "..", "testdata", "Start.expected.modules.txt")
+
 	expected, err := readExpectedModuleNames(expectedPath)
 	if err != nil {
 		t.Fatalf("readExpectedModuleNames: %v", err)
 	}
 
 	actualSet := map[string]struct{}{}
+
 	for _, module := range modules {
 		name := strings.TrimSpace(module.Name)
 		if name == "" {
 			continue
 		}
+
 		actualSet[name] = struct{}{}
 	}
 
 	var missing []string
+
 	for _, name := range expected {
 		if _, ok := actualSet[name]; !ok {
 			missing = append(missing, name)
@@ -119,7 +134,6 @@ func TestExtractAllModulesMatchesExpectedManifest(t *testing.T) {
 func TestOptionalExtractionFixtures(t *testing.T) {
 	optional := []string{"AT990426.mdb", "PPS.mdb"}
 	for _, fixtureName := range optional {
-		fixtureName := fixtureName
 		t.Run(fixtureName, func(t *testing.T) {
 			path, ok := findOptionalFixture(fixtureName)
 			if !ok {
@@ -141,6 +155,7 @@ func TestOptionalExtractionFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ExtractAllModules: %v", err)
 			}
+
 			if len(modules) == 0 {
 				t.Fatal("no modules extracted from optional fixture")
 			}
@@ -150,6 +165,7 @@ func TestOptionalExtractionFixtures(t *testing.T) {
 
 func TestStartMDBSpotCheckCountsAndContent(t *testing.T) {
 	db := testDB(t)
+
 	st, err := LoadStorageTree(db)
 	if err != nil {
 		t.Fatalf("LoadStorageTree: %v", err)
@@ -174,6 +190,7 @@ func TestStartMDBSpotCheckCountsAndContent(t *testing.T) {
 		if strings.TrimSpace(m.Name) == "" {
 			continue
 		}
+
 		moduleByName[m.Name] = m
 	}
 
@@ -183,9 +200,11 @@ func TestStartMDBSpotCheckCountsAndContent(t *testing.T) {
 		if !ok {
 			t.Fatalf("spot-check module %q not found", name)
 		}
+
 		if !strings.Contains(strings.ToLower(m.Text), "attribute vb_name") {
 			t.Fatalf("module %q does not contain Attribute VB_Name", name)
 		}
+
 		lines := strings.Count(m.Text, "\n")
 		if lines < 2 {
 			t.Fatalf("module %q has too few lines: %d", name, lines)
@@ -201,14 +220,17 @@ func readExpectedModuleNames(path string) ([]string, error) {
 	defer f.Close()
 
 	var names []string
+
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+
 		names = append(names, line)
 	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
@@ -225,6 +247,7 @@ func findOptionalFixture(name string) (string, bool) {
 	if dir := os.Getenv("VBA_FIXTURE_DIR"); dir != "" {
 		candidates = append(candidates, filepath.Join(dir, name))
 	}
+
 	candidates = append(candidates, filepath.Join("..", "..", "testdata", name))
 
 	for _, candidate := range candidates {

@@ -29,12 +29,14 @@ func TestResolveMemo_PROJECT(t *testing.T) {
 		if !ok || len(lvRaw) == 0 {
 			t.Fatal("PROJECT stream has no Lv data")
 		}
+
 		t.Logf("PROJECT Lv raw: %d bytes, first 16: %x", len(lvRaw), lvRaw[:min(16, len(lvRaw))])
 
 		data, err := db.ResolveMemo(lvRaw)
 		if err != nil {
 			t.Fatalf("ResolveMemo: %v", err)
 		}
+
 		if len(data) == 0 {
 			t.Fatal("PROJECT stream data is empty after resolution")
 		}
@@ -50,6 +52,7 @@ func TestResolveMemo_PROJECT(t *testing.T) {
 				t.Errorf("PROJECT stream missing %q", want)
 			}
 		}
+
 		return
 	}
 

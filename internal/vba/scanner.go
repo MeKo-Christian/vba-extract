@@ -30,25 +30,30 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 
 	// First pass: collect all next-pointer targets so we can identify chain starts.
 	targets := make(map[uint64]struct{}, 8192)
-	for pg := 0; pg < pageCount; pg++ {
+
+	for pg := range pageCount {
 		page, err := db.ReadPage(int64(pg))
 		if err != nil || page[0] != pageTypeData {
 			continue
 		}
+
 		numRows := int(binary.LittleEndian.Uint16(page[lvalNumRows:]))
-		for row := 0; row < numRows; row++ {
+		for row := range numRows {
 			rowOff := lvalRowTable + row*2
 			if rowOff+2 > len(page) {
 				break
 			}
+
 			offVal := binary.LittleEndian.Uint16(page[rowOff:])
 			if offVal&0x4000 != 0 { // deleted flag
 				continue
 			}
+
 			start := int(offVal & lvalRowMask)
 			if start+4 > len(page) {
 				continue
 			}
+
 			nextPtr := binary.LittleEndian.Uint32(page[start:])
 			if nextPtr != 0 {
 				targets[uint64(nextPtr)] = struct{}{}
@@ -60,25 +65,29 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 	seen := make(map[string]struct{})
 	var results []ExtractedModule
 
-	for pg := 0; pg < pageCount; pg++ {
+	for pg := range pageCount {
 		page, err := db.ReadPage(int64(pg))
 		if err != nil || page[0] != pageTypeData {
 			continue
 		}
+
 		numRows := int(binary.LittleEndian.Uint16(page[lvalNumRows:]))
-		for row := 0; row < numRows; row++ {
+		for row := range numRows {
 			key := uint64(pg)<<8 | uint64(row)
 			if _, isTarget := targets[key]; isTarget {
 				continue // not a chain start
 			}
+
 			rowOff := lvalRowTable + row*2
 			if rowOff+2 > len(page) {
 				break
 			}
+
 			offVal := binary.LittleEndian.Uint16(page[rowOff:])
 			if offVal&0x4000 != 0 {
 				continue
 			}
+
 			start := int(offVal & lvalRowMask)
 			if start+4 > len(page) {
 				continue
@@ -101,6 +110,7 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 				prevOff := binary.LittleEndian.Uint16(page[lvalRowTable+(row-1)*2:])
 				rowEnd = int(prevOff & lvalRowMask)
 			}
+
 			rowSize := rowEnd - start
 			firstByte := page[firstContent]
 			// Keep chains where the first content byte is the container signature,
@@ -121,9 +131,11 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 			if module == nil {
 				continue
 			}
+
 			if _, dup := seen[module.Name]; dup {
 				continue
 			}
+
 			seen[module.Name] = struct{}{}
 			results = append(results, *module)
 		}
@@ -136,7 +148,7 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 // raw LVAL chain data. It scans all positions looking for a CompressedContainer
 // that decompresses to valid VBA source.
 func tryExtractModuleFromChain(data []byte) *ExtractedModule {
-	for i := 0; i < len(data)-4; i++ {
+	for i := range len(data) - 4 {
 		if data[i] != compressedContainerSig {
 			continue
 		}
@@ -147,6 +159,7 @@ func tryExtractModuleFromChain(data []byte) *ExtractedModule {
 		if i+3 > len(data) {
 			break
 		}
+
 		nibble := data[i+2] >> 4
 		if nibble != 0x3 && nibble != 0xB {
 			continue
@@ -158,18 +171,22 @@ func tryExtractModuleFromChain(data []byte) *ExtractedModule {
 		if err != nil || len(dec) < 40 {
 			continue
 		}
+
 		text := cleanupVBA(decodeBestText(dec))
 		if !strings.Contains(strings.ToLower(text), "attribute vb_name") {
 			continue
 		}
+
 		name := extractModuleNameFromText(text)
 		if name == "" {
 			continue
 		}
+
 		moduleType := ProjectModuleStandard
 		if strings.Contains(strings.ToLower(text), "attribute vb_base") {
 			moduleType = ProjectModuleDocument
 		}
+
 		return &ExtractedModule{
 			Name:   name,
 			Type:   moduleType,
@@ -177,6 +194,7 @@ func tryExtractModuleFromChain(data []byte) *ExtractedModule {
 			Stream: "orphaned-lval",
 		}
 	}
+
 	return nil
 }
 
@@ -185,8 +203,10 @@ func extractModuleNameFromText(text string) string {
 	if m == nil {
 		return ""
 	}
+
 	name := strings.TrimSpace(m[1])
 	// Remove null bytes that can appear in p-code embedded text
 	name = strings.ReplaceAll(name, "\x00", "")
+
 	return name
 }

@@ -2,6 +2,7 @@ package vba
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -34,7 +35,7 @@ func ExtractAllModules(st *StorageTree, log *slog.Logger) ([]ExtractedModule, er
 
 	projectNode := required["PROJECT"]
 	if projectNode == nil || len(projectNode.Data) == 0 {
-		return nil, fmt.Errorf("vba: PROJECT stream missing or empty")
+		return nil, errors.New("vba: PROJECT stream missing or empty")
 	}
 
 	projectInfo, err := ParseProjectStream(projectNode.Data)
@@ -43,6 +44,7 @@ func ExtractAllModules(st *StorageTree, log *slog.Logger) ([]ExtractedModule, er
 	}
 
 	var dirInfo *DirInfo
+
 	dirNode := required["dir"]
 	if dirNode != nil && len(dirNode.Data) > 0 {
 		dirInfo, err = ParseDirStream(dirNode.Data, func(in []byte) ([]byte, error) {
@@ -104,29 +106,35 @@ func extractModuleSource(mapping ModuleMapping, log *slog.Logger) (string, []str
 		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
 			return cleanupVBA(text), warnings, false
 		}
+
 		return recoverPartialFromRaw(mapping.Data, warnings)
 	}
 
 	sourceCandidate := mapping.Data[offset:]
+
 	finalRaw, srcStrategy, srcErr := DecompressContainerWithFallback(sourceCandidate, log)
 	if srcErr != nil {
 		warnings = append(warnings, fmt.Sprintf("source decompression failed at offset %d: %v; trying brute-force scan", offset, srcErr))
 		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
 			return cleanupVBA(text), warnings, false
 		}
+
 		return recoverPartialFromRaw(mapping.Data, warnings)
 	}
+
 	if srcStrategy != StrategyStandard {
 		warnings = append(warnings, fmt.Sprintf("source decompression used strategy %s", srcStrategy))
 	}
 
 	decoded := decodeBestText(finalRaw)
+
 	decoded = cleanupVBA(decoded)
 	if !looksLikeVBASource(decoded) {
 		warnings = append(warnings, "decoded source does not contain strong VBA markers")
 		if text, ok := bruteForceOffsetScan(mapping.Data); ok {
 			return cleanupVBA(text), warnings, false
 		}
+
 		if partial, pOK := recoverPartialText(finalRaw); pOK {
 			return partial, warnings, true
 		}
@@ -139,7 +147,7 @@ func bruteForceOffsetScan(streamDecompressed []byte) (string, bool) {
 	bestScore := -1
 	best := ""
 
-	for i := 0; i < len(streamDecompressed); i++ {
+	for i := range streamDecompressed {
 		if streamDecompressed[i] != compressedContainerSig {
 			continue
 		}
@@ -150,6 +158,7 @@ func bruteForceOffsetScan(streamDecompressed []byte) (string, bool) {
 		}
 
 		candidate := cleanupVBA(decodeBestText(candidateRaw))
+
 		score := scoreVBAText(candidate)
 		if score > bestScore {
 			bestScore = score
@@ -169,6 +178,7 @@ func recoverPartialFromRaw(raw []byte, warnings []string) (string, []string, boo
 	if !ok {
 		return "", append(warnings, "no recoverable VBA fragments found"), true
 	}
+
 	return partial, warnings, true
 }
 
@@ -184,6 +194,7 @@ func recoverPartialText(raw []byte) (string, bool) {
 		if trimmed == "" {
 			continue
 		}
+
 		for _, keyword := range keywords {
 			if strings.Contains(trimmed, keyword) {
 				kept = append(kept, trimmed)
@@ -197,6 +208,7 @@ func recoverPartialText(raw []byte) (string, bool) {
 	}
 
 	text := "[PARTIAL - reconstructed from p-code tokens]\n" + strings.Join(kept, "\n") + "\n"
+
 	return text, true
 }
 
@@ -213,12 +225,14 @@ func decodeBestText(raw []byte) string {
 	if decoded, err := charmap.Windows1252.NewDecoder().Bytes(raw); err == nil {
 		candidates = append(candidates, string(decoded))
 	}
+
 	if decoded, err := charmap.ISO8859_1.NewDecoder().Bytes(raw); err == nil {
 		candidates = append(candidates, string(decoded))
 	}
 
 	best := ""
 	bestScore := -1
+
 	for _, candidate := range candidates {
 		score := scoreVBAText(candidate)
 		if score > bestScore {
@@ -241,25 +255,31 @@ func scoreVBAText(text string) int {
 	if strings.Contains(t, "attribute vb_name") {
 		score += 5
 	}
+
 	if strings.Contains(t, "option explicit") {
 		score += 3
 	}
+
 	if strings.Contains(t, "sub ") {
 		score += 2
 	}
+
 	if strings.Contains(t, "function ") {
 		score += 2
 	}
+
 	if strings.Contains(t, "docmd") || strings.Contains(t, "msgbox") {
 		score += 1
 	}
 
 	printable := 0
+
 	for _, r := range text {
 		if r == '\n' || r == '\r' || r == '\t' || (r >= 32 && r <= 126) || (r >= 160 && r <= 255) {
 			printable++
 		}
 	}
+
 	if len(text) > 0 {
 		ratio := float64(printable) / float64(len(text))
 		if ratio > 0.95 {
@@ -274,10 +294,12 @@ func cleanupVBA(text string) string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\r", "\n")
 	text = strings.TrimRight(text, "\x00")
+
 	text = strings.TrimSpace(text)
 	if text != "" {
 		text += "\n"
 	}
+
 	return text
 }
 
@@ -299,6 +321,7 @@ func ExtractModuleMap(st *StorageTree, log *slog.Logger) (map[string]ExtractedMo
 		if strings.TrimSpace(module.Name) == "" {
 			continue
 		}
+
 		out[module.Name] = module
 	}
 
@@ -309,9 +332,11 @@ func joinWarnings(a []string, b ...string) []string {
 	if len(b) == 0 {
 		return a
 	}
+
 	out := make([]string, 0, len(a)+len(b))
 	out = append(out, a...)
 	out = append(out, b...)
+
 	return out
 }
 
@@ -321,19 +346,23 @@ func containsAny(text string, needles []string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func splitNonEmptyLines(s string) []string {
 	parts := strings.Split(s, "\n")
+
 	out := make([]string, 0, len(parts))
 	for _, line := range parts {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
+
 		out = append(out, line)
 	}
+
 	return out
 }
 
@@ -344,17 +373,21 @@ func compactWhitespace(s string) string {
 func normalizeForMatch(s string) string {
 	s = cleanupVBA(s)
 	s = compactWhitespace(s)
+
 	return strings.TrimSpace(s)
 }
 
 func similarVBA(a, b string) bool {
 	na := normalizeForMatch(a)
+
 	nb := normalizeForMatch(b)
 	if na == "" || nb == "" {
 		return false
 	}
+
 	if na == nb {
 		return true
 	}
+
 	return bytes.Contains([]byte(na), []byte(nb)) || bytes.Contains([]byte(nb), []byte(na))
 }

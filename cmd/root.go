@@ -24,6 +24,7 @@ var rootCmd = &cobra.Command{
 		} else {
 			h = slog.DiscardHandler
 		}
+
 		slog.SetDefault(slog.New(h))
 	},
 }

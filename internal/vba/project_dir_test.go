@@ -12,6 +12,7 @@ func buildDirRecord(id uint16, payload []byte) []byte {
 	_ = binary.Write(&b, binary.LittleEndian, id)
 	_ = binary.Write(&b, binary.LittleEndian, uint32(len(payload)))
 	b.Write(payload)
+
 	return b.Bytes()
 }
 
@@ -34,9 +35,11 @@ func TestParseProjectStream(t *testing.T) {
 	if info.Modules[0].Name != "Mod1" || info.Modules[0].Type != ProjectModuleStandard {
 		t.Fatalf("module[0] = %+v, want Mod1/standard", info.Modules[0])
 	}
+
 	if info.Modules[1].Name != "Class1" || info.Modules[1].Type != ProjectModuleClass {
 		t.Fatalf("module[1] = %+v, want Class1/class", info.Modules[1])
 	}
+
 	if info.Modules[2].Name != "Form_Main" || info.Modules[2].Type != ProjectModuleDocument {
 		t.Fatalf("module[2] = %+v, want Form_Main/document", info.Modules[2])
 	}
@@ -73,12 +76,15 @@ func TestParseDirStreamRecords(t *testing.T) {
 	if m.ModuleName != "Mod1" {
 		t.Fatalf("ModuleName = %q, want %q", m.ModuleName, "Mod1")
 	}
+
 	if m.StreamName != "STREAM_ABC" {
 		t.Fatalf("StreamName = %q, want %q", m.StreamName, "STREAM_ABC")
 	}
+
 	if m.SourceOff != 123 {
 		t.Fatalf("SourceOff = %d, want 123", m.SourceOff)
 	}
+
 	if m.Type != DirModuleProcedural {
 		t.Fatalf("Type = %q, want %q", m.Type, DirModuleProcedural)
 	}
@@ -111,6 +117,7 @@ func TestParseDirStreamWithDecompressor(t *testing.T) {
 	if len(info.Modules) != 1 {
 		t.Fatalf("modules = %d, want 1", len(info.Modules))
 	}
+
 	if info.Modules[0].SourceOff != 7 {
 		t.Fatalf("SourceOff = %d, want 7", info.Modules[0].SourceOff)
 	}
@@ -134,6 +141,7 @@ func TestBuildModuleMappingsFallback(t *testing.T) {
 	if len(warns) == 0 {
 		t.Fatal("expected fallback warning")
 	}
+
 	if len(mappings) != 2 {
 		t.Fatalf("mappings = %d, want 2", len(mappings))
 	}
@@ -141,6 +149,7 @@ func TestBuildModuleMappingsFallback(t *testing.T) {
 	if mappings[0].ModuleName != "Mod1" || mappings[0].StreamName != "ASTREAM" {
 		t.Fatalf("mapping[0] = %+v, want Mod1->ASTREAM", mappings[0])
 	}
+
 	if mappings[1].ModuleName != "Mod2" || mappings[1].StreamName != "ZSTREAM" {
 		t.Fatalf("mapping[1] = %+v, want Mod2->ZSTREAM", mappings[1])
 	}
@@ -174,6 +183,7 @@ func TestParseProjectFromStartMDB(t *testing.T) {
 	}
 
 	docClasses, standards := 0, 0
+
 	for _, m := range info.Modules {
 		switch m.Type {
 		case ProjectModuleDocument:
@@ -182,12 +192,15 @@ func TestParseProjectFromStartMDB(t *testing.T) {
 			standards++
 		}
 	}
+
 	if docClasses != 6 {
 		t.Errorf("DocClass modules = %d, want 6", docClasses)
 	}
+
 	if standards != 9 {
 		t.Errorf("Standard modules = %d, want 9", standards)
 	}
+
 	if info.Name != "Start" {
 		t.Errorf("project name = %q, want %q", info.Name, "Start")
 	}
@@ -195,6 +208,7 @@ func TestParseProjectFromStartMDB(t *testing.T) {
 
 func TestBuildModuleMappingsStartMDB(t *testing.T) {
 	db := testDB(t)
+
 	st, err := LoadStorageTree(db)
 	if err != nil {
 		t.Fatalf("LoadStorageTree: %v", err)
@@ -204,6 +218,7 @@ func TestBuildModuleMappingsStartMDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RequiredStreams: %v", err)
 	}
+
 	moduleStreams, err := st.ModuleStreams()
 	if err != nil {
 		t.Fatalf("ModuleStreams: %v", err)
@@ -232,6 +247,7 @@ func TestBuildModuleMappingsStartMDB(t *testing.T) {
 		if m.StreamName == "" {
 			t.Errorf("module %q has empty StreamName", m.ModuleName)
 		}
+
 		if m.SourceOffset == 0 {
 			t.Logf("module %q has sourceOffset=0 (may be valid)", m.ModuleName)
 		}

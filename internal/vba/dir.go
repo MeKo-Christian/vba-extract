@@ -53,7 +53,7 @@ const (
 // decompressor is provided, ErrDirNeedsDecompression is returned.
 func ParseDirStream(data []byte, decompressor DirDecompressor) (*DirInfo, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("vba: dir stream is empty")
+		return nil, errors.New("vba: dir stream is empty")
 	}
 
 	work := data
@@ -66,6 +66,7 @@ func ParseDirStream(data []byte, decompressor DirDecompressor) (*DirInfo, error)
 		if err != nil {
 			return nil, fmt.Errorf("vba: decompress dir stream: %w", err)
 		}
+
 		work = decoded
 	}
 
@@ -80,9 +81,11 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 		if current == nil {
 			return
 		}
+
 		if current.ModuleName == "" && current.StreamName == "" {
 			return
 		}
+
 		result.Modules = append(result.Modules, *current)
 		current = nil
 	}
@@ -91,7 +94,9 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 		if i+6 > len(data) {
 			break
 		}
+
 		recID := binary.LittleEndian.Uint16(data[i : i+2])
+
 		recSize := int(binary.LittleEndian.Uint32(data[i+2 : i+6]))
 		if i+6+recSize > len(data) {
 			break
@@ -102,6 +107,7 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 		switch recID {
 		case dirRecModuleName:
 			appendCurrent()
+
 			current = &DirModule{
 				ModuleName: trimText(payload),
 				Type:       DirModuleUnknown,
@@ -110,6 +116,7 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 			if current == nil {
 				current = &DirModule{Type: DirModuleUnknown}
 			}
+
 			current.StreamName = trimText(payload)
 		case dirRecModuleStreamNameUTF16:
 			// Keep ANSI stream name from 0x001A as canonical; unicode variant is optional.
@@ -120,6 +127,7 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 			if current == nil {
 				current = &DirModule{Type: DirModuleUnknown}
 			}
+
 			if len(payload) >= 4 {
 				current.SourceOff = binary.LittleEndian.Uint32(payload[:4])
 			}
@@ -127,11 +135,13 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 			if current == nil {
 				current = &DirModule{}
 			}
+
 			current.Type = DirModuleProcedural
 		case dirRecModuleTypeClass:
 			if current == nil {
 				current = &DirModule{}
 			}
+
 			current.Type = DirModuleClass
 		case dirRecModuleTerminator:
 			appendCurrent()
@@ -151,7 +161,7 @@ func parseDirRecords(data []byte) (*DirInfo, error) {
 	appendCurrent()
 
 	if len(result.Modules) == 0 {
-		return nil, fmt.Errorf("vba: dir stream parser found no module records")
+		return nil, errors.New("vba: dir stream parser found no module records")
 	}
 
 	return result, nil
@@ -167,7 +177,9 @@ func trimText(b []byte) string {
 	if err != nil {
 		decoded = b
 	}
+
 	text := strings.TrimRight(string(decoded), "\x00")
+
 	return strings.TrimSpace(text)
 }
 
@@ -190,6 +202,7 @@ func BuildModuleMappings(project *ProjectInfo, dirInfo *DirInfo, moduleStreams [
 		if sortedStreams[i].ID == sortedStreams[j].ID {
 			return sortedStreams[i].Name < sortedStreams[j].Name
 		}
+
 		return sortedStreams[i].ID < sortedStreams[j].ID
 	})
 
@@ -206,6 +219,7 @@ func BuildModuleMappings(project *ProjectInfo, dirInfo *DirInfo, moduleStreams [
 		if module.ModuleName == "" {
 			continue
 		}
+
 		dirByModule[strings.ToLower(module.ModuleName)] = module
 	}
 
@@ -251,13 +265,10 @@ func BuildModuleMappings(project *ProjectInfo, dirInfo *DirInfo, moduleStreams [
 }
 
 func fallbackModuleMappings(project *ProjectInfo, sortedStreams []*StorageNode) []ModuleMapping {
-	n := len(project.Modules)
-	if len(sortedStreams) < n {
-		n = len(sortedStreams)
-	}
+	n := min(len(sortedStreams), len(project.Modules))
 
 	mappings := make([]ModuleMapping, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		module := project.Modules[i]
 		stream := sortedStreams[i]
 		mappings = append(mappings, ModuleMapping{

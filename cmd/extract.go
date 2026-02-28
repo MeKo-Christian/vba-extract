@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -24,8 +25,9 @@ var extractCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		if len(inputs) == 0 {
-			return fmt.Errorf("no .mdb/.accdb files found in inputs")
+			return errors.New("no .mdb/.accdb files found in inputs")
 		}
 
 		baseOut := defaultOutputDir()
@@ -44,28 +46,36 @@ var extractCmd = &cobra.Command{
 						slog.Default().Debug("skip duplicate", "file", file, "sameAs", prev)
 						continue
 					}
+
 					seenHashes[hash] = file
 				}
 			}
 
 			processed++
+
 			modules, loadErr := loadModules(file)
 			if loadErr != nil {
 				failed++
+
 				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)
+
 				if extractStrict {
 					return loadErr
 				}
+
 				continue
 			}
 
 			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat || format == "flat")
 			if writeErr != nil {
 				failed++
+
 				fmt.Printf("%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), writeErr)
+
 				if extractStrict {
 					return writeErr
 				}
+
 				continue
 			}
 
@@ -75,9 +85,11 @@ var extractCmd = &cobra.Command{
 		}
 
 		fmt.Printf("summary: processed=%d modules=%d lines=%d failed=%d output=%s\n", processed, writtenModules, totalLines, failed, baseOut)
+
 		if extractStrict && failed > 0 {
 			return fmt.Errorf("strict mode: %d file(s) failed", failed)
 		}
+
 		return nil
 	},
 }

@@ -34,6 +34,7 @@ var listCmd = &cobra.Command{
 			if entries[i].Name == entries[j].Name {
 				return entries[i].Stream < entries[j].Stream
 			}
+
 			return entries[i].Name < entries[j].Name
 		})
 
@@ -43,6 +44,7 @@ var listCmd = &cobra.Command{
 
 		fmt.Printf("file: %s modules: %d\n", args[0], len(entries))
 		printListTable(entries)
+
 		return nil
 	},
 }
