@@ -25,6 +25,30 @@ const (
 	tdefColEntrySize  = 25
 )
 
+// Jet3 TDEF offsets and entry sizes.
+const (
+	tdef3NumRows       = 0x0C
+	tdef3TableType     = 0x14
+	tdef3NumCols       = 0x19
+	tdef3NumIdxs       = 0x1B
+	tdef3NumRealIdxs   = 0x1F
+	tdef3ColsStart     = 0x2B
+	tdef3RIdxEntrySize = 8
+	tdef3ColEntrySize  = 18
+)
+
+// Jet3 column definition offsets within an 18-byte entry.
+const (
+	col3TypeOff      = 0
+	col3NumOff       = 1
+	col3OffsetVarOff = 3
+	col3ScaleOff     = 12
+	col3PrecOff      = 11
+	col3FlagsOff     = 13
+	col3OffsetFixOff = 14
+	col3LenOff       = 16
+)
+
 // Column definition offsets within a 25-byte entry.
 const (
 	colTypeOff      = 0
@@ -180,8 +204,68 @@ func (db *Database) ReadTableDef(tdefPage int64) (*TableDef, error) {
 	return td, nil
 }
 
-func (db *Database) readTableDefJet3(_ int64) (*TableDef, error) {
-	return nil, ErrJet3TableLayoutUnsupported
+func (db *Database) readTableDefJet3(tdefPage int64) (*TableDef, error) {
+	tdefData, err := db.readTDEFPages(tdefPage)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tdefData) < tdef3ColsStart {
+		return nil, fmt.Errorf("mdb: Jet3 TDEF at page %d too short (%d bytes)", tdefPage, len(tdefData))
+	}
+
+	td := &TableDef{
+		DefPage:     tdefPage,
+		NumRows:     binary.LittleEndian.Uint32(tdefData[tdef3NumRows:]),
+		TableType:   tdefData[tdef3TableType],
+		NumIdxs:     binary.LittleEndian.Uint32(tdefData[tdef3NumIdxs:]),
+		NumRealIdxs: binary.LittleEndian.Uint32(tdefData[tdef3NumRealIdxs:]),
+		db:          db,
+	}
+
+	numCols := int(binary.LittleEndian.Uint16(tdefData[tdef3NumCols:]))
+	colStart := tdef3ColsStart + int(td.NumRealIdxs)*tdef3RIdxEntrySize
+	if colStart+numCols*tdef3ColEntrySize > len(tdefData) {
+		return nil, fmt.Errorf("mdb: Jet3 TDEF at page %d: column data extends past TDEF (%d cols, colStart=%d, tdefLen=%d)",
+			tdefPage, numCols, colStart, len(tdefData))
+	}
+
+	td.Columns = make([]*Column, numCols)
+	for i := range numCols {
+		off := colStart + i*tdef3ColEntrySize
+		entry := tdefData[off : off+tdef3ColEntrySize]
+
+		td.Columns[i] = &Column{
+			Type:      entry[col3TypeOff],
+			ColNum:    uint16(entry[col3NumOff]),
+			OffsetVar: binary.LittleEndian.Uint16(entry[col3OffsetVarOff:]),
+			Scale:     entry[col3ScaleOff],
+			Precision: entry[col3PrecOff],
+			Flags:     entry[col3FlagsOff],
+			OffsetFix: binary.LittleEndian.Uint16(entry[col3OffsetFixOff:]),
+			Length:    binary.LittleEndian.Uint16(entry[col3LenOff:]),
+		}
+	}
+
+	// Jet3 names are stored with a 1-byte byte-length prefix.
+	nameOff := colStart + numCols*tdef3ColEntrySize
+	for i := range numCols {
+		if nameOff+1 > len(tdefData) {
+			return nil, fmt.Errorf("mdb: Jet3 TDEF at page %d: name data truncated at column %d", tdefPage, i)
+		}
+
+		nameLen := int(tdefData[nameOff])
+		nameOff++
+
+		if nameOff+nameLen > len(tdefData) {
+			return nil, fmt.Errorf("mdb: Jet3 TDEF at page %d: name %d extends past TDEF", tdefPage, i)
+		}
+
+		td.Columns[i].Name = decodeJet3Text(tdefData[nameOff : nameOff+nameLen])
+		nameOff += nameLen
+	}
+
+	return td, nil
 }
 
 // readTDEFPages reads the complete table definition by following the next-page chain.
@@ -229,6 +313,15 @@ func decodeUCS2(b []byte) string {
 	}
 
 	return string(utf16.Decode(u16))
+}
+
+func decodeJet3Text(b []byte) string {
+	end := len(b)
+	for end > 0 && b[end-1] == 0 {
+		end--
+	}
+
+	return string(b[:end])
 }
 
 // ColTypeName returns a human-readable name for a column type byte.
