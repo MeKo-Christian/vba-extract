@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const testMDB = "../../testdata/Start.mdb"
+const testMDB = "../testdata/Start.mdb"
 
 func skipIfNoFixture(t *testing.T) {
 	t.Helper()
@@ -60,5 +60,25 @@ func TestLoadSchema_missingFile(t *testing.T) {
 	_, err := loadSchema("/nonexistent/path.mdb")
 	if err == nil {
 		t.Error("expected error for missing file")
+	}
+}
+
+func TestLoadSchema_legacyFixture(t *testing.T) {
+	path := "../testdata/jet35/st990426.mdb"
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skip("legacy fixture not available")
+	}
+
+	schema, err := loadSchema(path)
+	if err != nil {
+		t.Fatalf("loadSchema legacy fixture: %v", err)
+	}
+
+	if schema == nil {
+		t.Fatal("expected non-nil schema from legacy fixture")
+	}
+
+	if len(schema.Tables) == 0 {
+		t.Fatal("expected at least one table in legacy fixture schema")
 	}
 }

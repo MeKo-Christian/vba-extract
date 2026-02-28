@@ -19,7 +19,7 @@ accessdump/
 │   └── common.go              Shared I/O helpers
 └── internal/
     ├── mdb/
-    │   ├── reader.go          Low-level Jet 4 page reader
+    │   ├── reader.go          Low-level Jet/ACE page reader (2K/4K)
     │   ├── table.go           Table definition and row iteration
     │   ├── column.go          Column type detection and value reading
     │   ├── memo.go            Long Value (MEMO/OLE) field resolution
@@ -34,30 +34,39 @@ accessdump/
         └── forensic.go        Storage tree forensic scoring
 ```
 
-## Jet 4 / ACE database format
+## Jet / ACE database format
 
-A Jet 4 or ACE database file is a flat array of 4096-byte pages:
+An Access database file is a flat array of fixed-size pages:
+
+- **Jet 3.x**: 2048-byte pages (`jet3-2k`)
+- **Jet 4 / ACE**: 4096-byte pages (`jet4-4k`)
+
+`accessdump` detects page layout by probing page signatures first (page types on pages 1 and 2), then falls back to the header version field when probing is inconclusive.
+
+For 4K layouts:
 
 - **Page 0** — Database header: magic bytes, version, codepage, encryption key
 - **Page 2** — System catalog (`MSysObjects`): table names and root page pointers
-- **Data pages** (type `0x01`) — Table rows, indexed by a row-offset table at the start
+- **Data pages** (type `0x01`) — Table rows, indexed by a row-offset table near the start
 - **Table-definition pages** (type `0x02`) — Column metadata and data-page pointers
 - **Long Value pages** — Chained data pages for MEMO/OLE fields; each record has a 4-byte next-pointer as its first field
 
-The `internal/mdb` package reads these structures. It does not support Jet 3.5 (Access 97, 2048-byte pages) or encrypted databases.
+For 2K layouts, the same page types exist with different offsets in data-page and row parsing paths.
+
+The `internal/mdb` package supports Jet 3.x/Jet 4/ACE layout parsing for schema and VBA extraction paths. Encrypted databases are still unsupported.
 
 ### Long Value (LVAL) chain format
 
 Large field values (MEMO/OLE columns) are stored in LVAL chains:
 
 ```plain
-12-byte reference in the row:
+MEMO/OLE reference in the row:
   bytes 0-2  : total data length (3-byte little-endian)
   byte  3    : storage type  0x00=multi-page  0x40=single-page  0x80=inline
   bytes 4-7  : first page/row pointer  (pageNum << 8) | rowID
   bytes 8-11 : reserved
 
-Each LVAL record:
+Each LVAL record (page layout-specific row offsets):
   bytes 0-3  : next-record pointer  (pageNum << 8) | rowID, or 0 for last
   bytes 4..  : data payload
 ```

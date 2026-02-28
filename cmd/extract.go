@@ -60,7 +60,7 @@ var extractCmd = &cobra.Command{
 			if loadErr != nil {
 				failed++
 
-				fmt.Fprintf(out, "%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)
+				fmt.Fprintf(out, "%s %s: %s\n", colorize("31", "ERROR"), filepath.Base(file), formatCommandError(file, loadErr))
 
 				if extractStrict {
 					return loadErr
@@ -69,11 +69,11 @@ var extractCmd = &cobra.Command{
 				continue
 			}
 
-			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat||format == "flat", extractOverwriteReadme)
+			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat || format == "flat", extractOverwriteReadme)
 			if writeErr != nil {
 				failed++
 
-				fmt.Fprintf(out, "%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), writeErr)
+				fmt.Fprintf(out, "%s %s: %s\n", colorize("31", "ERROR"), filepath.Base(file), formatCommandError(file, writeErr))
 
 				if extractStrict {
 					return writeErr
@@ -85,6 +85,12 @@ var extractCmd = &cobra.Command{
 			writtenModules += count
 			totalLines += lines
 			fmt.Fprintf(out, "%s %s -> modules=%d lines=%d\n", colorize("32", "OK"), filepath.Base(file), count, lines)
+
+			partialModules, warningCount := extractionStats(modules)
+			if partialModules > 0 || warningCount > 0 {
+				fmt.Fprintf(out, "%s %s -> partial=%d warnings=%d\n",
+					colorize("33", "WARN"), filepath.Base(file), partialModules, warningCount)
+			}
 		}
 
 		fmt.Fprintf(out, "summary: processed=%d modules=%d lines=%d failed=%d output=%s\n", processed, writtenModules, totalLines, failed, baseOut)

@@ -25,3 +25,19 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      - name: Jet3 Synthetic Regression
+        if: matrix.go-version == '1.25.x'
+        run: |
+          go test ./internal/mdb -run 'TestProbeClassifiesSyntheticJet32K|TestOpenJet3Uses2048PageSize|TestReadTableDefJet3Synthetic|TestReadRowsJet3Synthetic|TestResolveMemoJet3'
+          go test ./internal/vba -run 'TestScanOrphanedLvalModules_Jet3LayoutSynthetic'
+
+      - name: Optional Legacy Fixture Regression
+        if: matrix.go-version == '1.25.x'
+        run: |
+          if [[ -f testdata/jet35/st990426.mdb ]]; then
+            go test ./internal/vba -run 'TestExtractAllModulesFromLegacyFixture'
+            go test ./cmd -run 'TestLoadSchema_legacyFixture'
+          else
+            echo "Legacy fixture testdata/jet35/st990426.mdb not present; skipping optional fixture regression."
+          fi

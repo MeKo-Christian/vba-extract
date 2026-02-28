@@ -151,11 +151,18 @@ Use `--output-dir` to specify the root directory, and `--flat` to skip the per-d
 
 ## Supported formats
 
-| Format              | Extension | Engine            |
-| ------------------- | --------- | ----------------- |
-| Access 97           | `.mdb`    | Jet 3.5 (partial) |
-| Access 2000 – 2003  | `.mdb`    | Jet 4.0           |
-| Access 2007 – 2019+ | `.accdb`  | ACE               |
+| Format              | Extension | Engine / Layout          | Status |
+| ------------------- | --------- | ------------------------ | ------ |
+| Access 97           | `.mdb`    | Jet 3.x (`jet3-2k`)      | Partial: parser paths, memo/LVAL, and VBA extraction are implemented; broader fixture coverage is still in progress |
+| Legacy header `.mdb`| `.mdb`    | non-standard Jet header + 4K pages (`legacy-4k`) | Supported via layout probing |
+| Access 2000 – 2003  | `.mdb`    | Jet 4.0 (`jet4-4k`)      | Supported |
+| Access 2007 – 2019+ | `.accdb`  | ACE (`jet4-4k`)          | Supported |
+
+## Current limitations
+
+- Encrypted or password-protected Access databases are not supported yet.
+- `jet3-2k` real-world fixture coverage in CI is still limited; synthetic Jet3 tests are always run, while legacy fixture tests are optional.
+- Corrupted/truncated databases are best-effort and may produce partial VBA recovery.
 
 ## How forensic VBA recovery works
 
@@ -171,6 +178,14 @@ Duplicate module names (multiple on-disk copies) are deduplicated; only the firs
 ```sh
 # Run tests
 go test ./...
+
+# Jet3 synthetic regression subset
+go test ./internal/mdb -run 'TestProbeClassifiesSyntheticJet32K|TestOpenJet3Uses2048PageSize|TestReadTableDefJet3Synthetic|TestReadRowsJet3Synthetic|TestResolveMemoJet3'
+go test ./internal/vba -run 'TestScanOrphanedLvalModules_Jet3LayoutSynthetic'
+
+# Optional local legacy fixture regression (if fixture exists)
+go test ./internal/vba -run TestExtractAllModulesFromLegacyFixture
+go test ./cmd -run TestLoadSchema_legacyFixture
 
 # Run with verbose output on a test file
 go run . extract --verbose testdata/Start.mdb

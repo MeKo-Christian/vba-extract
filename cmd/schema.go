@@ -60,7 +60,7 @@ var schemaCmd = &cobra.Command{
 			if loadErr != nil {
 				failed++
 
-				fmt.Fprintf(out, "%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), loadErr)
+				fmt.Fprintf(out, "%s %s: %s\n", colorize("31", "ERROR"), filepath.Base(file), formatCommandError(file, loadErr))
 
 				if schemaStrict {
 					return loadErr
@@ -69,11 +69,11 @@ var schemaCmd = &cobra.Command{
 				continue
 			}
 
-			writeErr := writeSchema(baseOut, file, schema, schemaFlat||format == "flat", schemaOverwriteReadme)
+			writeErr := writeSchema(baseOut, file, schema, schemaFlat || format == "flat", schemaOverwriteReadme)
 			if writeErr != nil {
 				failed++
 
-				fmt.Fprintf(out, "%s %s: %v\n", colorize("31", "ERROR"), filepath.Base(file), writeErr)
+				fmt.Fprintf(out, "%s %s: %s\n", colorize("31", "ERROR"), filepath.Base(file), formatCommandError(file, writeErr))
 
 				if schemaStrict {
 					return writeErr

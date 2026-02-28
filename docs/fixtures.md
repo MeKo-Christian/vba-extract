@@ -30,3 +30,11 @@ No encrypted/unknown fixtures were identified by the current heuristic scan.
 ## Notes
 - `testdata/` is gitignored in this repo, so large/private fixtures remain local by design.
 - CI-safe coverage is provided by synthetic fixtures plus optional local fixtures when present.
+
+## Regression Commands
+- Synthetic Jet3 coverage (always CI-safe):
+  - `go test ./internal/mdb -run 'TestProbeClassifiesSyntheticJet32K|TestOpenJet3Uses2048PageSize|TestReadTableDefJet3Synthetic|TestReadRowsJet3Synthetic|TestResolveMemoJet3'`
+  - `go test ./internal/vba -run 'TestScanOrphanedLvalModules_Jet3LayoutSynthetic'`
+- Optional local fixture coverage:
+  - `go test ./internal/vba -run TestExtractAllModulesFromLegacyFixture`
+  - `go test ./cmd -run TestLoadSchema_legacyFixture`

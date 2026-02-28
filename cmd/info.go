@@ -31,22 +31,28 @@ var infoCmd = &cobra.Command{
 
 		names, _ := db.TableNames()
 		sort.Strings(names)
+		layout := layoutClass(db.PageSize(), db.Header.JetVersion)
 
 		fmt.Fprintf(out, "file: %s\n", args[0])
 		fmt.Fprintf(out, "jetVersion: %d\n", db.Header.JetVersion)
+		fmt.Fprintf(out, "pageSize: %d\n", db.PageSize())
+		fmt.Fprintf(out, "layoutClass: %s\n", layout)
+		if hint := layoutHint(layout); hint != "" {
+			fmt.Fprintf(out, "layoutHint: %s\n", hint)
+		}
 		fmt.Fprintf(out, "codepage: %d\n", db.Header.CodePage)
 		fmt.Fprintf(out, "pageCount: %d\n", db.PageCount())
 		fmt.Fprintf(out, "tableCount: %d\n", len(names))
 
 		st, err := vba.LoadStorageTree(db)
 		if err != nil {
-			fmt.Fprintf(out, "vba: unavailable (%v)\n", err)
+			fmt.Fprintf(out, "vba: unavailable (%s)\n", formatCommandError(args[0], err))
 			return nil
 		}
 
 		required, reqErr := st.RequiredStreams()
 		if reqErr != nil {
-			fmt.Fprintf(out, "vba: storage present, but required streams unresolved (%v)\n", reqErr)
+			fmt.Fprintf(out, "vba: storage present, but required streams unresolved (%s)\n", formatCommandError(args[0], reqErr))
 		} else {
 			if projectNode := required["PROJECT"]; projectNode != nil && len(projectNode.Data) > 0 {
 				project, parseErr := vba.ParseProjectStream(projectNode.Data)
