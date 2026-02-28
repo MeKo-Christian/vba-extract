@@ -1,5 +1,13 @@
 # AI assists
 .claude/
 
+# Binaries
+accessdump
+accessdump.exe
+
+# Coverage
+coverage.out
+coverage.html
+
 # Testdata
 testdata/
