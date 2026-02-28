@@ -149,6 +149,16 @@ func loadModules(path string, verbose bool) ([]vba.ExtractedModule, error) {
 		return scanned, nil
 	}
 
+	// Both standard extraction and LVAL scan found nothing. If the only failure
+	// was "no VBA structure found" (MSysAccessStorage missing or empty), treat
+	// that as a database with no VBA rather than a hard error — return empty.
+	// Only propagate errors that indicate a real read failure.
+	if extractErr != nil && scanErr == nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "vba: no VBA found in %q (%v)\n", path, extractErr)
+		}
+		return nil, nil
+	}
 	if extractErr != nil {
 		return nil, fmt.Errorf("extract modules %q: %w", path, extractErr)
 	}
