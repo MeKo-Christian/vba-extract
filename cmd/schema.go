@@ -213,74 +213,91 @@ func renderMarkdown(dbName string, s *mdb.Schema) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s — Schema\n\n", dbName)
 
-	if len(s.Tables) > 0 {
-		fmt.Fprintf(&b, "## Tables\n\n")
-
-		for _, table := range s.Tables {
-			fmt.Fprintf(&b, "### %s\n\n", table.Name)
-			fmt.Fprintf(&b, "| Column | Type | Size | Required |\n")
-			fmt.Fprintf(&b, "|---|---|---|---|\n")
-
-			for _, col := range table.Columns {
-				size := "—"
-				if col.Size > 0 {
-					size = strconv.Itoa(col.Size)
-				}
-
-				req := ""
-				if col.Required {
-					req = "✓"
-				}
-
-				name := col.Name
-				if col.AutoIncrement {
-					name += " *(auto)*"
-				}
-
-				fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", name, col.SQLType, size, req)
-			}
-
-			fmt.Fprintf(&b, "\n")
-		}
-	}
-
-	if len(s.Relationships) > 0 {
-		fmt.Fprintf(&b, "## Relationships\n\n")
-
-		for _, rel := range s.Relationships {
-			cascade := ""
-			if rel.CascadeUpdate {
-				cascade += " (cascade update)"
-			}
-
-			if rel.CascadeDelete {
-				cascade += " (cascade delete)"
-			}
-
-			fmt.Fprintf(&b, "- `%s.%s` → `%s.%s`%s\n",
-				rel.FromTable, strings.Join(rel.FromColumns, ", "),
-				rel.ToTable, strings.Join(rel.ToColumns, ", "),
-				cascade)
-		}
-
-		fmt.Fprintf(&b, "\n")
-	}
-
-	if len(s.Queries) > 0 {
-		fmt.Fprintf(&b, "## Queries\n\n")
-
-		for _, q := range s.Queries {
-			fmt.Fprintf(&b, "### %s\n\n", q.Name)
-
-			if q.SQL != "" {
-				fmt.Fprintf(&b, "```sql\n%s\n```\n\n", strings.TrimSpace(q.SQL))
-			} else {
-				fmt.Fprintf(&b, "*SQL not available*\n\n")
-			}
-		}
-	}
+	writeTableMarkdown(&b, s.Tables)
+	writeRelationshipMarkdown(&b, s.Relationships)
+	writeQueryMarkdown(&b, s.Queries)
 
 	return b.String()
+}
+
+func writeTableMarkdown(b *strings.Builder, tables []mdb.TableSchema) {
+	if len(tables) == 0 {
+		return
+	}
+
+	fmt.Fprintf(b, "## Tables\n\n")
+
+	for _, table := range tables {
+		fmt.Fprintf(b, "### %s\n\n", table.Name)
+		fmt.Fprintf(b, "| Column | Type | Size | Required |\n")
+		fmt.Fprintf(b, "|---|---|---|---|\n")
+
+		for _, col := range table.Columns {
+			size := "—"
+			if col.Size > 0 {
+				size = strconv.Itoa(col.Size)
+			}
+
+			req := ""
+			if col.Required {
+				req = "✓"
+			}
+
+			name := col.Name
+			if col.AutoIncrement {
+				name += " *(auto)*"
+			}
+
+			fmt.Fprintf(b, "| %s | %s | %s | %s |\n", name, col.SQLType, size, req)
+		}
+
+		fmt.Fprintf(b, "\n")
+	}
+}
+
+func writeRelationshipMarkdown(b *strings.Builder, relationships []mdb.Relationship) {
+	if len(relationships) == 0 {
+		return
+	}
+
+	fmt.Fprintf(b, "## Relationships\n\n")
+
+	for _, rel := range relationships {
+		cascade := ""
+		if rel.CascadeUpdate {
+			cascade += " (cascade update)"
+		}
+
+		if rel.CascadeDelete {
+			cascade += " (cascade delete)"
+		}
+
+		fmt.Fprintf(b, "- `%s.%s` → `%s.%s`%s\n",
+			rel.FromTable, strings.Join(rel.FromColumns, ", "),
+			rel.ToTable, strings.Join(rel.ToColumns, ", "),
+			cascade)
+	}
+
+	fmt.Fprintf(b, "\n")
+}
+
+func writeQueryMarkdown(b *strings.Builder, queries []mdb.QueryDef) {
+	if len(queries) == 0 {
+		return
+	}
+
+	fmt.Fprintf(b, "## Queries\n\n")
+
+	for _, q := range queries {
+		fmt.Fprintf(b, "### %s\n\n", q.Name)
+
+		if q.SQL != "" {
+			fmt.Fprintf(b, "```sql\n%s\n```\n\n", strings.TrimSpace(q.SQL))
+			continue
+		}
+
+		fmt.Fprintf(b, "*SQL not available*\n\n")
+	}
 }
 
 // quoteIdent wraps an identifier in Access-style square brackets.

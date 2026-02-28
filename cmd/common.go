@@ -35,42 +35,9 @@ func discoverInputFiles(args []string, recursive bool) ([]string, error) {
 		}
 
 		for _, candidate := range expanded {
-			info, err := os.Stat(candidate)
+			err = collectInputCandidate(candidate, recursive, seen, &files)
 			if err != nil {
-				return nil, fmt.Errorf("stat %q: %w", candidate, err)
-			}
-
-			if info.IsDir() {
-				if !recursive {
-					continue
-				}
-
-				err = filepath.WalkDir(candidate, func(path string, d os.DirEntry, walkErr error) error {
-					if walkErr != nil {
-						return walkErr
-					}
-
-					if d.IsDir() {
-						return nil
-					}
-
-					if !isAccessFile(path) {
-						return nil
-					}
-
-					addUniquePath(path, seen, &files)
-
-					return nil
-				})
-				if err != nil {
-					return nil, fmt.Errorf("walk %q: %w", candidate, err)
-				}
-
-				continue
-			}
-
-			if isAccessFile(candidate) {
-				addUniquePath(candidate, seen, &files)
+				return nil, err
 			}
 		}
 	}
@@ -78,6 +45,44 @@ func discoverInputFiles(args []string, recursive bool) ([]string, error) {
 	sort.Strings(files)
 
 	return files, nil
+}
+
+func collectInputCandidate(candidate string, recursive bool, seen map[string]struct{}, files *[]string) error {
+	info, err := os.Stat(candidate)
+	if err != nil {
+		return fmt.Errorf("stat %q: %w", candidate, err)
+	}
+
+	if !info.IsDir() {
+		if isAccessFile(candidate) {
+			addUniquePath(candidate, seen, files)
+		}
+
+		return nil
+	}
+
+	if !recursive {
+		return nil
+	}
+
+	err = filepath.WalkDir(candidate, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if d.IsDir() || !isAccessFile(path) {
+			return nil
+		}
+
+		addUniquePath(path, seen, files)
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk %q: %w", candidate, err)
+	}
+
+	return nil
 }
 
 func expandArg(arg string) ([]string, error) {

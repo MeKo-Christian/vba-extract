@@ -1,12 +1,24 @@
 # accessdump
 
-Extract VBA source code from Microsoft Access databases (`.mdb` / `.accdb`) on Linux — no Windows, no Wine, no ODBC drivers required.
+Dump Microsoft Access databases (`.mdb` / `.accdb`) to plain text on Linux — no Windows, no Wine, no ODBC drivers required.
+
+Extracts two things from an Access file:
+
+- **VBA source code** — every module as a `.bas` or `.cls` file, ready for version control or code review
+- **Database schema** — table definitions, foreign-key relationships, and saved queries as SQL DDL and Markdown
 
 ## What it does
 
-Access databases embed VBA projects as compressed binary streams inside the database file. `accessdump` reads the raw Jet/ACE page format, locates the VBA project, decompresses each module's source, and writes `.bas` / `.cls` files that can be opened in any editor or version-controlled.
+Access databases are binary files built on the Jet/ACE page format. `accessdump` reads those pages directly and recovers:
 
-It handles two classes of database:
+| What                               | Where it comes from                                  |
+| ---------------------------------- | ---------------------------------------------------- |
+| VBA module source (`.bas`, `.cls`) | Compressed binary streams in the VBA project storage |
+| Table columns, types, constraints  | `MSysObjects` / column definition pages              |
+| Foreign-key relationships          | `MSysRelationships` system table                     |
+| Saved queries                      | `MSysQueries` system table                           |
+
+It handles two classes of database when extracting VBA:
 
 | Situation                                                      | How it's handled                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -17,13 +29,13 @@ It handles two classes of database:
 ## Installation
 
 ```sh
-go install github.com/MeKo-Tech/accessdump@latest
+go install github.com/MeKo-Christian/accessdump@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/MeKo-Tech/accessdump
+git clone https://github.com/MeKo-Christian/accessdump
 cd accessdump
 go build -o accessdump .
 ```
@@ -56,6 +68,38 @@ accessdump extract --strict *.mdb
 # Show recovery details
 accessdump extract --verbose MyDatabase.mdb
 ```
+
+### Extract database schema
+
+```sh
+# Single file — writes <dbname>.schema.sql and <dbname>.schema.md
+accessdump schema MyDatabase.mdb
+
+# Multiple files / recursive
+accessdump schema *.mdb
+accessdump schema --recursive /path/to/databases/
+
+# Flat output (no per-database subdirectory)
+accessdump schema --flat --output-dir ./schema MyDatabase.mdb
+
+# Skip duplicates, stop on first error
+accessdump schema --dedupe --strict *.mdb
+```
+
+Output per database:
+
+```
+vba-output/
+└── MyDatabase/
+    ├── MyDatabase.schema.sql   ← CREATE TABLE / ALTER TABLE / CREATE VIEW statements
+    └── MyDatabase.schema.md    ← human-readable table and relationship reference
+```
+
+The `.schema.sql` file contains:
+
+- `CREATE TABLE` with column names, SQL types, `NOT NULL`, and `AUTOINCREMENT`
+- `ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY` for every relationship, with `ON UPDATE`/`ON DELETE CASCADE` where applicable
+- `CREATE VIEW` for SELECT queries; action queries (INSERT/UPDATE/DELETE) are preserved as SQL comments
 
 ### List modules without extracting
 
@@ -91,14 +135,16 @@ accessdump info --forensic MyDatabase.mdb
 
 ## Output
 
-By default, modules are written to `vba-output/<database-name>/`:
+By default, all output goes into `vba-output/<database-name>/`:
 
 ```
 vba-output/
 └── MyDatabase/
-    ├── Module1.bas
+    ├── Module1.bas              ← VBA modules
     ├── UserForm1.cls
-    └── Sheet1.cls
+    ├── Sheet1.cls
+    ├── MyDatabase.schema.sql    ← schema (schema command)
+    └── MyDatabase.schema.md
 ```
 
 Use `--output-dir` to specify the root directory, and `--flat` to skip the per-database subdirectory.
@@ -107,11 +153,11 @@ Use `--output-dir` to specify the root directory, and `--flat` to skip the per-d
 
 | Format              | Extension | Engine            |
 | ------------------- | --------- | ----------------- |
+| Access 97           | `.mdb`    | Jet 3.5 (partial) |
 | Access 2000 – 2003  | `.mdb`    | Jet 4.0           |
 | Access 2007 – 2019+ | `.accdb`  | ACE               |
-| Access 97           | `.mdb`    | Jet 3.5 (partial) |
 
-## How forensic recovery works
+## How forensic VBA recovery works
 
 When a database's `MSysAccessStorage` system table is missing or its VBA module references have been stripped, `accessdump` falls back to a two-pass LVAL page scan:
 
@@ -128,9 +174,10 @@ go test ./...
 
 # Run with verbose output on a test file
 go run . extract --verbose testdata/Start.mdb
+go run . schema testdata/Start.mdb
 ```
 
-Test fixtures live in `testdata/`. The expected extraction results for `Start.mdb` are in `testdata/Start.expected.modules.txt`.
+Test fixtures live in `testdata/`. Set `VBA_FIXTURE_DIR` to point at a directory of real `.mdb` files for integration testing against production data.
 
 ## License
 

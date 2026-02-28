@@ -192,26 +192,37 @@ func (db *Database) readQueries(names map[string]struct{}) []QueryDef {
 	sqlByName := make(map[string]string)
 
 	td, err := db.FindTable("MSysQueries")
-	if err == nil {
-		rows, rErr := td.ReadRows()
-		if rErr == nil {
-			for _, row := range rows {
-				if intField(row, "Attribute") != 0 {
-					continue
-				}
-
-				name := stringField(row, "Name")
-				if _, wanted := names[name]; !wanted || name == "" {
-					continue
-				}
-
-				if expr := stringField(row, "Expression"); expr != "" {
-					sqlByName[name] = expr
-				}
-			}
-		}
+	if err != nil {
+		return buildQueryDefs(names, sqlByName)
 	}
 
+	rows, err := td.ReadRows()
+	if err != nil {
+		return buildQueryDefs(names, sqlByName)
+	}
+
+	for _, row := range rows {
+		if intField(row, "Attribute") != 0 {
+			continue
+		}
+
+		name := stringField(row, "Name")
+		if _, wanted := names[name]; !wanted || name == "" {
+			continue
+		}
+
+		expr := stringField(row, "Expression")
+		if expr == "" {
+			continue
+		}
+
+		sqlByName[name] = expr
+	}
+
+	return buildQueryDefs(names, sqlByName)
+}
+
+func buildQueryDefs(names map[string]struct{}, sqlByName map[string]string) []QueryDef {
 	queries := make([]QueryDef, 0, len(names))
 	for name := range names {
 		queries = append(queries, QueryDef{Name: name, SQL: sqlByName[name]})
