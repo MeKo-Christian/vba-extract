@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 
@@ -138,14 +139,30 @@ func asInt32(v any) (int32, bool) {
 	case int16:
 		return int32(t), true
 	case int:
+		if t < math.MinInt32 || t > math.MaxInt32 {
+			return 0, false
+		}
+
 		return int32(t), true
 	case uint16:
 		return int32(t), true
 	case uint32:
+		if t > math.MaxInt32 {
+			return 0, false
+		}
+
 		return int32(t), true
 	case int64:
+		if t < math.MinInt32 || t > math.MaxInt32 {
+			return 0, false
+		}
+
 		return int32(t), true
 	case uint64:
+		if t > math.MaxInt32 {
+			return 0, false
+		}
+
 		return int32(t), true
 	default:
 		return 0, false

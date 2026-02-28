@@ -48,7 +48,7 @@ func TestForensicDetectsAccessArtifacts(t *testing.T) {
 			ID:   10,
 			Name: "Blob",
 			Type: 2,
-			Data: []byte("Form_Order\nCaption=Order\nRecordSource=SELECT * FROM Orders\nOnClick=Macro"),
+			Data: []byte("Form_Order\nCaption=Order\nRecordSource=SELECT ID FROM Orders\nOnClick=Macro"),
 		},
 	}
 

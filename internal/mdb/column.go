@@ -192,8 +192,8 @@ func (td *TableDef) parseRow(data []byte, sortedCols []*Column) (Row, error) {
 		if colIdx < numCols {
 			byteIdx := colIdx / 8
 
-			bitIdx := uint(colIdx % 8)
-			if byteIdx < len(nullMask) && nullMask[byteIdx]&(1<<bitIdx) == 0 {
+			bitMask := byte(1 << (colIdx % 8))
+			if byteIdx < len(nullMask) && nullMask[byteIdx]&bitMask == 0 {
 				row[col.Name] = nil
 				continue
 			}
@@ -230,13 +230,13 @@ func readFixedColumn(data []byte, col *Column, baseOff int) any {
 			return nil
 		}
 
-		return int16(binary.LittleEndian.Uint16(data[off:]))
+		return readLEInt16(data[off], data[off+1])
 	case ColTypeLong:
 		if off+4 > len(data) {
 			return nil
 		}
 
-		return int32(binary.LittleEndian.Uint32(data[off:]))
+		return readLEInt32(data[off : off+4])
 	case ColTypeFloat:
 		if off+4 > len(data) {
 			return nil
@@ -294,13 +294,13 @@ func readVarColumn(data []byte, col *Column, varOffsets []int, numVarCols int) a
 		return nil
 	case ColTypeInt:
 		if len(raw) >= 2 {
-			return int16(binary.LittleEndian.Uint16(raw))
+			return readLEInt16(raw[0], raw[1])
 		}
 
 		return nil
 	case ColTypeLong:
 		if len(raw) >= 4 {
-			return int32(binary.LittleEndian.Uint32(raw))
+			return readLEInt32(raw)
 		}
 
 		return nil
@@ -327,4 +327,12 @@ func readVarColumn(data []byte, col *Column, varOffsets []int, numVarCols int) a
 
 		return result
 	}
+}
+
+func readLEInt16(b0, b1 byte) int16 {
+	return int16(b0) | int16(b1)<<8
+}
+
+func readLEInt32(raw []byte) int32 {
+	return int32(raw[0]) | int32(raw[1])<<8 | int32(raw[2])<<16 | int32(raw[3])<<24
 }

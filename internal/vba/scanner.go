@@ -29,7 +29,7 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 	pageCount := int(db.PageCount())
 
 	// First pass: collect all next-pointer targets so we can identify chain starts.
-	targets := make(map[uint64]struct{}, 8192)
+	targets := make(map[int64]struct{}, 8192)
 
 	for pg := range pageCount {
 		page, err := db.ReadPage(int64(pg))
@@ -56,7 +56,7 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 
 			nextPtr := binary.LittleEndian.Uint32(page[start:])
 			if nextPtr != 0 {
-				targets[uint64(nextPtr)] = struct{}{}
+				targets[int64(nextPtr)] = struct{}{}
 			}
 		}
 	}
@@ -73,7 +73,7 @@ func ScanOrphanedLvalModules(db *mdb.Database) ([]ExtractedModule, error) {
 
 		numRows := int(binary.LittleEndian.Uint16(page[lvalNumRows:]))
 		for row := range numRows {
-			key := uint64(pg)<<8 | uint64(row)
+			key := int64(pg)<<8 | int64(row)
 			if _, isTarget := targets[key]; isTarget {
 				continue // not a chain start
 			}

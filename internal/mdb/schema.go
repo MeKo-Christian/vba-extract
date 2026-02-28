@@ -2,6 +2,7 @@ package mdb
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 )
@@ -239,6 +240,10 @@ func intField(row Row, key string) int32 {
 	case int8:
 		return int32(v)
 	case uint32:
+		if v > math.MaxInt32 {
+			return 0
+		}
+
 		return int32(v)
 	}
 
