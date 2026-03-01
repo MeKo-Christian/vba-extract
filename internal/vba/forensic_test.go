@@ -3,7 +3,7 @@ package vba
 import "testing"
 
 func TestForensicScanStorageStartMDB(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {

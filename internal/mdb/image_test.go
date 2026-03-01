@@ -1,14 +1,24 @@
 package mdb_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/MeKo-Christian/accessdump/internal/mdb"
 )
 
+func skipIfNoStartMDB(t *testing.T) {
+	t.Helper()
+	_, err := os.Stat(filepath.Join("..", "..", "testdata", "Start.mdb"))
+	if os.IsNotExist(err) {
+		t.Skip("testdata/Start.mdb not available (proprietary fixture)")
+	}
+}
+
 func TestExtractImages_StartMDB(t *testing.T) {
-	dbPath := filepath.Join("..", "..", "testdata", "sample.mdb")
+	skipIfNoStartMDB(t)
+	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
 
 	db, err := mdb.Open(dbPath)
 	if err != nil {
@@ -73,6 +83,7 @@ func TestExtractImages_StartMDB(t *testing.T) {
 }
 
 func TestScanBlobForImages_NoImages(t *testing.T) {
+	skipIfNoStartMDB(t)
 	// A blob with no image signatures should return nothing.
 	blob := make([]byte, 1024)
 	for i := range blob {
@@ -81,7 +92,7 @@ func TestScanBlobForImages_NoImages(t *testing.T) {
 	// Make sure it doesn't accidentally contain JPEG/PNG/BMP/GIF signatures.
 	// The loop above produces 0xFF at index 255, 0xD8 at index 216 — not adjacent.
 
-	dbPath := filepath.Join("..", "..", "testdata", "sample.mdb")
+	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
 
 	db, err := mdb.Open(dbPath)
 	if err != nil {
@@ -103,7 +114,8 @@ func TestScanBlobForImages_NoImages(t *testing.T) {
 }
 
 func TestExtractImages_ImageSizes(t *testing.T) {
-	dbPath := filepath.Join("..", "..", "testdata", "sample.mdb")
+	skipIfNoStartMDB(t)
+	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
 
 	db, err := mdb.Open(dbPath)
 	if err != nil {

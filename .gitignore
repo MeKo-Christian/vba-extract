@@ -10,5 +10,6 @@ coverage.out
 coverage.html
 
 # Testdata
-testdata/
+testdata/jet35/
+testdata/Start*.*
 vba-output/

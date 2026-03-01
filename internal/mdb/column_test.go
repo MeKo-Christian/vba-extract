@@ -25,8 +25,7 @@ func TestReadRows_MSysObjects(t *testing.T) {
 
 	// Check that we can find known tables.
 	wantTables := map[string]bool{
-		"MSysAccessStorage": false,
-		"MSysObjects":       false,
+		"MSysObjects": false,
 	}
 
 	for _, row := range rows {

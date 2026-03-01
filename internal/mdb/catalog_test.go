@@ -19,19 +19,16 @@ func TestCatalog(t *testing.T) {
 
 	t.Logf("Catalog has %d entries", len(entries))
 
-	// Look for MSysAccessStorage.
+	// MSysObjects must always be present.
 	found := false
-
 	for _, e := range entries {
-		if e.Name == "MSysAccessStorage" {
+		if e.Name == "MSysObjects" {
 			found = true
-
-			t.Logf("  MSysAccessStorage: ID=%d, Type=%d", e.ID, e.Type)
+			break
 		}
 	}
-
 	if !found {
-		t.Error("MSysAccessStorage not found in catalog")
+		t.Error("MSysObjects not found in catalog")
 	}
 }
 
@@ -46,7 +43,7 @@ func TestTableNames(t *testing.T) {
 	t.Logf("Tables: %v", names)
 
 	// sample.mdb should have these user tables.
-	wantTables := []string{"Module", "SYStabEinstellungen"}
+	wantTables := []string{"customers", "orders", "products"}
 	for _, want := range wantTables {
 		found := slices.Contains(names, want)
 
@@ -57,7 +54,7 @@ func TestTableNames(t *testing.T) {
 }
 
 func TestFindTable(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	td, err := db.FindTable("MSysAccessStorage")
 	if err != nil {
@@ -72,7 +69,7 @@ func TestFindTable(t *testing.T) {
 }
 
 func TestReadMSysAccessStorage(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	td, err := db.FindTable("MSysAccessStorage")
 	if err != nil {

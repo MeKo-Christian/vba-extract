@@ -62,7 +62,7 @@ func writeSyntheticJet3ScannerDB(t *testing.T, chainData []byte) string {
 func pickRecoverableModuleChainData(t *testing.T) ([]byte, string) {
 	t.Helper()
 
-	start := filepath.Join("..", "..", "testdata", "sample.mdb")
+	start := filepath.Join("..", "..", "testdata", "Start.mdb")
 
 	_, err := os.Stat(start)
 

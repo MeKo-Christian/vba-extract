@@ -67,7 +67,7 @@ func TestFindLikelyProjectNode_noMatchingNodes(t *testing.T) {
 // an actual dir stream, exercising the decompression-based node detection.
 
 func TestFindLikelyDirNode_withRealFixture(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {

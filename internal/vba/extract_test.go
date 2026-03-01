@@ -47,7 +47,7 @@ func TestRecoverPartialText(t *testing.T) {
 }
 
 func TestExtractAllModulesFromStartMDB(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {
@@ -87,7 +87,7 @@ func TestExtractAllModulesFromStartMDB(t *testing.T) {
 }
 
 func TestExtractAllModulesMatchesExpectedManifest(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestOptionalExtractionFixtures(t *testing.T) {
 }
 
 func TestStartMDBSpotCheckCountsAndContent(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {

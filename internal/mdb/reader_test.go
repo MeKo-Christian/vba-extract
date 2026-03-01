@@ -25,25 +25,32 @@ func testDB(t *testing.T) *Database {
 	return db
 }
 
+const startMDB = "../../testdata/Start.mdb"
+
+func startDB(t *testing.T) *Database {
+	t.Helper()
+	_, err := os.Stat(startMDB)
+	if os.IsNotExist(err) {
+		t.Skip("testdata/Start.mdb not available (proprietary fixture)")
+	}
+	db, err := Open(startMDB)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
 func TestOpenAndHeader(t *testing.T) {
 	db := testDB(t)
-
-	if db.Header.DBName != "Standard ACE DB" {
-		t.Errorf("DBName = %q, want %q", db.Header.DBName, "Standard ACE DB")
-	}
-
-	// sample.mdb is Access 2007+ format (version 3 = ACE12).
-	if db.Header.JetVersion != JetVersionACE {
-		t.Errorf("JetVersion = %d, want %d (ACE12)", db.Header.JetVersion, JetVersionACE)
-	}
 
 	if !db.IsJet4() {
 		t.Error("IsJet4() = false, want true")
 	}
 
-	// 907 pages (3715072 / 4096).
-	if db.PageCount() != 907 {
-		t.Errorf("PageCount = %d, want 907", db.PageCount())
+	// sample.mdb: 71 pages (290816 / 4096).
+	if db.PageCount() != 71 {
+		t.Errorf("PageCount = %d, want 71", db.PageCount())
 	}
 }
 

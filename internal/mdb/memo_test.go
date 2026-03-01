@@ -6,7 +6,7 @@ import (
 )
 
 func TestResolveMemo_PROJECT(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	td, err := db.FindTable("MSysAccessStorage")
 	if err != nil {

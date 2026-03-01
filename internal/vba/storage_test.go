@@ -7,28 +7,24 @@ import (
 	"github.com/MeKo-Christian/accessdump/internal/mdb"
 )
 
-const testMDB = "../../testdata/sample.mdb"
+const startMDB = "../../testdata/Start.mdb"
 
-func testDB(t *testing.T) *mdb.Database {
+func startDB(t *testing.T) *mdb.Database {
 	t.Helper()
-
-	_, err := os.Stat(testMDB)
+	_, err := os.Stat(startMDB)
 	if os.IsNotExist(err) {
-		t.Skip("testdata/sample.mdb not available")
+		t.Skip("testdata/Start.mdb not available (proprietary fixture)")
 	}
-
-	db, err := mdb.Open(testMDB)
+	db, err := mdb.Open(startMDB)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-
 	t.Cleanup(func() { _ = db.Close() })
-
 	return db
 }
 
 func TestLoadStorageTree(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {
@@ -45,7 +41,7 @@ func TestLoadStorageTree(t *testing.T) {
 }
 
 func TestVBAFolderAndStreams(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {
@@ -75,7 +71,7 @@ func TestVBAFolderAndStreams(t *testing.T) {
 }
 
 func TestModuleStreamsHaveData(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {

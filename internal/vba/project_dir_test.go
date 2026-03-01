@@ -170,7 +170,7 @@ func TestBuildModuleMappingsFallback(t *testing.T) {
 }
 
 func TestParseProjectFromStartMDB(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {
@@ -221,7 +221,7 @@ func TestParseProjectFromStartMDB(t *testing.T) {
 }
 
 func TestBuildModuleMappingsStartMDB(t *testing.T) {
-	db := testDB(t)
+	db := startDB(t)
 
 	st, err := LoadStorageTree(db)
 	if err != nil {

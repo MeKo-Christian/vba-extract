@@ -7,6 +7,8 @@ import (
 
 const testMDB = "../testdata/sample.mdb"
 
+const startMDB = "../testdata/Start.mdb"
+
 func skipIfNoFixture(t *testing.T) {
 	t.Helper()
 
@@ -16,18 +18,27 @@ func skipIfNoFixture(t *testing.T) {
 	}
 }
 
+func skipIfNoStartFixture(t *testing.T) {
+	t.Helper()
+
+	_, err := os.Stat(startMDB)
+	if os.IsNotExist(err) {
+		t.Skip("testdata/Start.mdb not available (proprietary fixture)")
+	}
+}
+
 // loadModules
 
 func TestLoadModules_returnsModules(t *testing.T) {
-	skipIfNoFixture(t)
+	skipIfNoStartFixture(t)
 
-	modules, err := loadModules(testMDB)
+	modules, err := loadModules(startMDB)
 	if err != nil {
 		t.Fatalf("loadModules: %v", err)
 	}
 
 	if len(modules) == 0 {
-		t.Fatal("expected at least one module from sample.mdb")
+		t.Fatal("expected at least one module from Start.mdb")
 	}
 }
 
@@ -67,9 +78,9 @@ func TestLoadSchema_missingFile(t *testing.T) {
 // loadImages
 
 func TestLoadImages_returnsImages(t *testing.T) {
-	skipIfNoFixture(t)
+	skipIfNoStartFixture(t)
 
-	images, err := loadImages(testMDB)
+	images, err := loadImages(startMDB)
 	if err != nil {
 		t.Fatalf("loadImages: %v", err)
 	}
@@ -97,16 +108,16 @@ func TestLoadImages_missingFile(t *testing.T) {
 }
 
 func TestWriteImages_createsFiles(t *testing.T) {
-	skipIfNoFixture(t)
+	skipIfNoStartFixture(t)
 
-	images, err := loadImages(testMDB)
+	images, err := loadImages(startMDB)
 	if err != nil {
 		t.Fatalf("loadImages: %v", err)
 	}
 
 	dir := t.TempDir()
 
-	count, err := writeImages(dir, testMDB, images, false)
+	count, err := writeImages(dir, startMDB, images, false)
 	if err != nil {
 		t.Fatalf("writeImages: %v", err)
 	}
