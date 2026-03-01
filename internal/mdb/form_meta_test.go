@@ -1,6 +1,7 @@
 package mdb
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -29,14 +30,7 @@ func TestScanBlobStrings_extractsUTF16LE(t *testing.T) {
 		t.Fatal("expected at least one string, got none")
 	}
 
-	found := false
-
-	for _, s := range got {
-		if s == "[Event Procedure]" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(got, "[Event Procedure]")
 
 	if !found {
 		t.Errorf("expected '[Event Procedure]' in %v", got)
@@ -64,14 +58,7 @@ func TestClassifyBlobStrings_eventProcedure(t *testing.T) {
 	strs := []string{"MyControl", "[Event Procedure]", "AnotherControl"}
 	meta := classifyBlobStrings("TestForm", strs)
 
-	found := false
-
-	for _, e := range meta.EventHandlers {
-		if e == "[Event Procedure]" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(meta.EventHandlers, "[Event Procedure]")
 
 	if !found {
 		t.Errorf("expected '[Event Procedure]' in EventHandlers, got %v", meta.EventHandlers)
