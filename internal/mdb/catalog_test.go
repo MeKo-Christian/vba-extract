@@ -21,12 +21,14 @@ func TestCatalog(t *testing.T) {
 
 	// MSysObjects must always be present.
 	found := false
+
 	for _, e := range entries {
 		if e.Name == "MSysObjects" {
 			found = true
 			break
 		}
 	}
+
 	if !found {
 		t.Error("MSysObjects not found in catalog")
 	}

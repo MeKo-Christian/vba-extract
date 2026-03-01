@@ -10,6 +10,7 @@ import (
 
 func skipIfNoStartMDB(t *testing.T) {
 	t.Helper()
+
 	_, err := os.Stat(filepath.Join("..", "..", "testdata", "Start.mdb"))
 	if os.IsNotExist(err) {
 		t.Skip("testdata/Start.mdb not available (proprietary fixture)")
@@ -18,6 +19,7 @@ func skipIfNoStartMDB(t *testing.T) {
 
 func TestExtractImages_StartMDB(t *testing.T) {
 	skipIfNoStartMDB(t)
+
 	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
 
 	db, err := mdb.Open(dbPath)
@@ -115,6 +117,7 @@ func TestScanBlobForImages_NoImages(t *testing.T) {
 
 func TestExtractImages_ImageSizes(t *testing.T) {
 	skipIfNoStartMDB(t)
+
 	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
 
 	db, err := mdb.Open(dbPath)

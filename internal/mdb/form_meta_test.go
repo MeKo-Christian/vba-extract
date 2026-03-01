@@ -30,6 +30,7 @@ func TestScanBlobStrings_extractsUTF16LE(t *testing.T) {
 	}
 
 	found := false
+
 	for _, s := range got {
 		if s == "[Event Procedure]" {
 			found = true
@@ -46,6 +47,7 @@ func TestScanBlobStrings_extractsUTF16LE(t *testing.T) {
 // characters are not returned.
 func TestScanBlobStrings_ignoresShortRuns(t *testing.T) {
 	blob := encodeUTF16LE("AB")
+
 	got := scanBlobStrings(blob)
 	for _, s := range got {
 		if s == "AB" {
@@ -63,6 +65,7 @@ func TestClassifyBlobStrings_eventProcedure(t *testing.T) {
 	meta := classifyBlobStrings("TestForm", strs)
 
 	found := false
+
 	for _, e := range meta.EventHandlers {
 		if e == "[Event Procedure]" {
 			found = true
@@ -144,6 +147,7 @@ func TestScanFormBlobs_startMDB(t *testing.T) {
 	}
 
 	t.Logf("Forms found: %d", len(forms))
+
 	for _, f := range forms {
 		t.Logf("  %q: RecordSource=%q, EventHandlers=%d",
 			f.Name, f.RecordSource, len(f.EventHandlers))
@@ -165,12 +169,14 @@ func TestScanFormBlobs_startMDB(t *testing.T) {
 		t.Error("expected form 'Übersicht' in results")
 	} else {
 		found := false
+
 		for _, e := range ueb.EventHandlers {
 			if strings.HasPrefix(e, "=HandleButtonClick(") {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("Übersicht: expected =HandleButtonClick() event, got %v", ueb.EventHandlers)
 		}

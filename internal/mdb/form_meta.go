@@ -152,6 +152,7 @@ func isPrintableBMP(w uint16) bool {
 	if w >= 0x00A0 && w <= 0x024F {
 		return true
 	}
+
 	return false
 }
 
@@ -162,6 +163,7 @@ func u16ToBytes(u16 []uint16) []byte {
 		b[i*2] = byte(v)
 		b[i*2+1] = byte(v >> 8)
 	}
+
 	return b
 }
 
@@ -178,5 +180,6 @@ func isNoisyString(s string) bool {
 			return true
 		}
 	}
+
 	return false
 }

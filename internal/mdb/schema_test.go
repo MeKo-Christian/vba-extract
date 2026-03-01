@@ -95,6 +95,7 @@ func TestReadQueriesStartMDB(t *testing.T) {
 			t.Errorf("%s: not found in schema queries", name)
 			continue
 		}
+
 		if q.SQLStatus != SQLStatusNotInTable {
 			t.Errorf("%s: expected SQLStatusNotInTable, got %s", name, q.SQLStatus)
 		}
@@ -105,6 +106,7 @@ func TestReadQueriesStartMDB(t *testing.T) {
 		if q.Name == "" {
 			t.Error("query with empty name")
 		}
+
 		if q.SQLStatus == "" {
 			t.Errorf("query %q: empty SQLStatus", q.Name)
 		}

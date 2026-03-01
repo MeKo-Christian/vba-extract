@@ -262,9 +262,11 @@ func writeFormMarkdown(b *strings.Builder, forms []mdb.FormMeta) {
 
 		if len(f.EventHandlers) > 0 {
 			fmt.Fprintf(b, "**Event handlers:**\n\n")
+
 			for _, e := range f.EventHandlers {
 				fmt.Fprintf(b, "- `%s`\n", e)
 			}
+
 			fmt.Fprintf(b, "\n")
 		}
 	}

@@ -235,10 +235,12 @@ func (db *Database) readQueries(names map[string]struct{}) []QueryDef {
 	}
 
 	nameByObjID := make(map[int32]string)
+
 	for _, e := range entries {
 		if e.Type != ObjTypeQuery {
 			continue
 		}
+
 		if _, wanted := names[e.Name]; wanted {
 			nameByObjID[int32(e.ID)] = e.Name
 		}
@@ -246,10 +248,12 @@ func (db *Database) readQueries(names map[string]struct{}) []QueryDef {
 
 	// Collect SQL from Attribute=0 rows, joined to catalog names via ObjectId.
 	sqlByName := make(map[string]string)
+
 	for _, row := range rows {
 		if intField(row, "Attribute") != 0 {
 			continue
 		}
+
 		oid, _ := row["ObjectId"].(int32)
 
 		name, ok := nameByObjID[oid]
@@ -264,6 +268,7 @@ func (db *Database) readQueries(names map[string]struct{}) []QueryDef {
 		}
 
 		var resolved []byte
+
 		resolved, err = db.ResolveMemo(exprRaw)
 		if err != nil || len(resolved) == 0 {
 			continue

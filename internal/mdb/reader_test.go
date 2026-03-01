@@ -29,15 +29,19 @@ const startMDB = "../../testdata/Start.mdb"
 
 func startDB(t *testing.T) *Database {
 	t.Helper()
+
 	_, err := os.Stat(startMDB)
 	if os.IsNotExist(err) {
 		t.Skip("testdata/Start.mdb not available (proprietary fixture)")
 	}
+
 	db, err := Open(startMDB)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { db.Close() })
+
 	return db
 }
 
