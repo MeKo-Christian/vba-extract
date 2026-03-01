@@ -334,7 +334,7 @@ func TestWriteQueryMarkdown_withSQL(t *testing.T) {
 func TestWriteQueryMarkdown_noSQL(t *testing.T) {
 	var b strings.Builder
 	queries := []mdb.QueryDef{
-		{Name: "Mystery", SQL: ""},
+		{Name: "Mystery", SQL: "", SQLStatus: mdb.SQLStatusNotInTable},
 	}
 
 	writeQueryMarkdown(&b, queries)
@@ -342,5 +342,47 @@ func TestWriteQueryMarkdown_noSQL(t *testing.T) {
 
 	if !strings.Contains(out, "SQL not available") {
 		t.Errorf("expected 'SQL not available', got: %q", out)
+	}
+}
+
+func TestWriteQueryMarkdown_statusTableMissing(t *testing.T) {
+	var b strings.Builder
+	queries := []mdb.QueryDef{
+		{Name: "Q", SQL: "", SQLStatus: mdb.SQLStatusTableMissing},
+	}
+
+	writeQueryMarkdown(&b, queries)
+	out := b.String()
+
+	if !strings.Contains(out, "table-missing") {
+		t.Errorf("expected status reason 'table-missing' in output, got: %q", out)
+	}
+}
+
+func TestWriteQueryMarkdown_statusNotInTable(t *testing.T) {
+	var b strings.Builder
+	queries := []mdb.QueryDef{
+		{Name: "Q", SQL: "", SQLStatus: mdb.SQLStatusNotInTable},
+	}
+
+	writeQueryMarkdown(&b, queries)
+	out := b.String()
+
+	if !strings.Contains(out, "not-in-table") {
+		t.Errorf("expected status reason 'not-in-table' in output, got: %q", out)
+	}
+}
+
+func TestRenderDDL_queryStatusInComment(t *testing.T) {
+	s := &mdb.Schema{
+		Queries: []mdb.QueryDef{
+			{Name: "Orphan", SQL: "", SQLStatus: mdb.SQLStatusTableMissing},
+		},
+	}
+
+	out := renderDDL("testdb", s)
+
+	if !strings.Contains(out, "table-missing") {
+		t.Errorf("expected status reason in DDL comment, got: %q", out)
 	}
 }

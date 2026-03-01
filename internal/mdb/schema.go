@@ -42,11 +42,25 @@ type Relationship struct {
 	CascadeDelete bool
 }
 
+// SQLStatus describes why a query's SQL text is present or absent.
+type SQLStatus string
+
+const (
+	// SQLStatusFound means the SQL text was successfully read from MSysQueries.
+	SQLStatusFound SQLStatus = "found"
+	// SQLStatusTableMissing means MSysQueries could not be opened at all
+	// (e.g. the table does not exist or the layout is unsupported).
+	SQLStatusTableMissing SQLStatus = "table-missing"
+	// SQLStatusNotInTable means MSysQueries was opened but contained no
+	// Attribute=0 row matching this query name.
+	SQLStatusNotInTable SQLStatus = "not-in-table"
+)
+
 // QueryDef is a named saved query.
-// SQL may be empty if it could not be read from MSysQueries.
 type QueryDef struct {
-	Name string
-	SQL  string
+	Name      string
+	SQL       string
+	SQLStatus SQLStatus
 }
 
 // MSysRelationships cascade flags.
@@ -187,45 +201,90 @@ func (db *Database) readRelationships() []Relationship {
 }
 
 // readQueries fetches SQL text from MSysQueries for each known query name.
-// Rows with Attribute == 0 carry the SQL in the Expression column.
+//
+// MSysQueries layout:
+//   - Rows are keyed by ObjectId, which matches the ID column in MSysObjects (the catalog).
+//   - The SQL text is in the "Expression" column on the row with Attribute == 0.
+//   - Expression is a Memo/LVAL column: ReadRows returns raw reference bytes that must be
+//     resolved via ResolveMemo and then decoded as UCS-2.
+//   - Some query types (append, update, delete, crosstab) store their definition in
+//     structured Attribute=5/6/7 rows instead of a single SQL string; for those,
+//     Attribute=0 Expression is empty and SQLStatusNotInTable is returned.
+//
+// Each returned QueryDef carries a SQLStatus explaining why SQL is present or absent.
 func (db *Database) readQueries(names map[string]struct{}) []QueryDef {
-	sqlByName := make(map[string]string)
-
 	td, err := db.FindTable("MSysQueries")
 	if err != nil {
-		return buildQueryDefs(names, sqlByName)
+		return buildQueryDefs(names, nil, SQLStatusTableMissing)
 	}
 
 	rows, err := td.ReadRows()
 	if err != nil {
-		return buildQueryDefs(names, sqlByName)
+		return buildQueryDefs(names, nil, SQLStatusTableMissing)
 	}
 
+	// Build ObjectId → catalog query name map from the catalog entries.
+	// MSysObjects stores the name; MSysQueries rows reference it via ObjectId = MSysObjects.ID.
+	entries, err := db.Catalog()
+	if err != nil {
+		return buildQueryDefs(names, nil, SQLStatusTableMissing)
+	}
+
+	nameByObjID := make(map[int32]string)
+	for _, e := range entries {
+		if e.Type != ObjTypeQuery {
+			continue
+		}
+		if _, wanted := names[e.Name]; wanted {
+			nameByObjID[int32(e.ID)] = e.Name
+		}
+	}
+
+	// Collect SQL from Attribute=0 rows, joined to catalog names via ObjectId.
+	sqlByName := make(map[string]string)
 	for _, row := range rows {
 		if intField(row, "Attribute") != 0 {
 			continue
 		}
+		oid, _ := row["ObjectId"].(int32)
 
-		name := stringField(row, "Name")
-		if _, wanted := names[name]; !wanted || name == "" {
+		name, ok := nameByObjID[oid]
+		if !ok {
 			continue
 		}
 
-		expr := stringField(row, "Expression")
-		if expr == "" {
+		// Expression is a Memo/LVAL: raw bytes returned by ReadRows need ResolveMemo + UCS-2 decode.
+		exprRaw, _ := row["Expression"].([]byte)
+		if len(exprRaw) == 0 {
 			continue
 		}
 
-		sqlByName[name] = expr
+		var resolved []byte
+		resolved, err = db.ResolveMemo(exprRaw)
+		if err != nil || len(resolved) == 0 {
+			continue
+		}
+
+		sqlByName[name] = decodeUCS2(resolved)
 	}
 
-	return buildQueryDefs(names, sqlByName)
+	return buildQueryDefs(names, sqlByName, SQLStatusNotInTable)
 }
 
-func buildQueryDefs(names map[string]struct{}, sqlByName map[string]string) []QueryDef {
+// buildQueryDefs assembles a sorted []QueryDef from a name set and a SQL map.
+// missingStatus is assigned to any query whose name is absent from sqlByName.
+func buildQueryDefs(names map[string]struct{}, sqlByName map[string]string, missingStatus SQLStatus) []QueryDef {
 	queries := make([]QueryDef, 0, len(names))
+
 	for name := range names {
-		queries = append(queries, QueryDef{Name: name, SQL: sqlByName[name]})
+		sql := sqlByName[name]
+		status := missingStatus
+
+		if sql != "" {
+			status = SQLStatusFound
+		}
+
+		queries = append(queries, QueryDef{Name: name, SQL: sql, SQLStatus: status})
 	}
 
 	sort.Slice(queries, func(i, j int) bool {
@@ -249,6 +308,8 @@ func intField(row Row, key string) int32 {
 	case int16:
 		return int32(v)
 	case int8:
+		return int32(v)
+	case uint8:
 		return int32(v)
 	case uint32:
 		if v > math.MaxInt32 {

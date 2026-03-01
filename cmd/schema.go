@@ -215,7 +215,7 @@ func renderDDL(dbName string, s *mdb.Schema) string {
 
 		for _, q := range s.Queries {
 			if q.SQL == "" {
-				fmt.Fprintf(&b, "-- Query: %s (SQL not available)\n\n", q.Name)
+				fmt.Fprintf(&b, "-- Query: %s (SQL not available: %s)\n\n", q.Name, q.SQLStatus)
 				continue
 			}
 
@@ -321,7 +321,7 @@ func writeQueryMarkdown(b *strings.Builder, queries []mdb.QueryDef) {
 			continue
 		}
 
-		fmt.Fprintf(b, "*SQL not available*\n\n")
+		fmt.Fprintf(b, "*SQL not available (%s)*\n\n", q.SQLStatus)
 	}
 }
 

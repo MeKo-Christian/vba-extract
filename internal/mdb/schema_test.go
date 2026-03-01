@@ -65,6 +65,52 @@ func TestReadSchemaFromStartMDB(t *testing.T) {
 	}
 }
 
+// TestReadQueriesStartMDB verifies query extraction behavior against Start.mdb.
+//
+// Start.mdb stores all queries in the structured Attribute=5/6/7 format (table/field
+// references) with no SQL text in Attribute=0 Expression. This is expected for
+// append/update/delete queries and some subform queries. The correct status is
+// SQLStatusNotInTable — not a parser bug.
+func TestReadQueriesStartMDB(t *testing.T) {
+	db := startDB(t)
+
+	s, err := db.ReadSchema()
+	if err != nil {
+		t.Fatalf("ReadSchema: %v", err)
+	}
+
+	if len(s.Queries) == 0 {
+		t.Fatal("expected at least one query in schema")
+	}
+
+	byName := make(map[string]QueryDef)
+	for _, q := range s.Queries {
+		byName[q.Name] = q
+	}
+
+	// All known queries in Start.mdb have no SQL text; status must be not-in-table.
+	for _, name := range []string{"QryErststart", "QryUpdate", "Qry_Module_aktiv"} {
+		q, ok := byName[name]
+		if !ok {
+			t.Errorf("%s: not found in schema queries", name)
+			continue
+		}
+		if q.SQLStatus != SQLStatusNotInTable {
+			t.Errorf("%s: expected SQLStatusNotInTable, got %s", name, q.SQLStatus)
+		}
+	}
+
+	// Every query must have a non-empty name and a valid status.
+	for _, q := range s.Queries {
+		if q.Name == "" {
+			t.Error("query with empty name")
+		}
+		if q.SQLStatus == "" {
+			t.Errorf("query %q: empty SQLStatus", q.Name)
+		}
+	}
+}
+
 func TestJetTypeToSQL(t *testing.T) {
 	cases := []struct {
 		typ       byte
