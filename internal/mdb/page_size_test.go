@@ -30,6 +30,7 @@ func writeSyntheticDB(t *testing.T, pageSize, pageCount int, jetVersion uint32) 
 	_, err = f.Write(data)
 	if err != nil {
 		_ = f.Close()
+
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -93,6 +94,7 @@ func TestOpenJet3Uses2048PageSize(t *testing.T) {
 	}
 
 	td := &TableDef{db: db}
+
 	_, err = td.parseRow([]byte{0, 0, 0, 0}, nil)
 	if errors.Is(err, ErrJet3RowLayoutUnsupported) {
 		t.Fatalf("parseRow should use Jet3 row parser path, got %v", err)

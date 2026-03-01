@@ -72,22 +72,36 @@ func formatCommandError(path string, err error) string {
 	}
 
 	// Add layout context when possible to make troubleshooting actionable.
-	if path != "" {
-		if _, statErr := os.Stat(path); statErr == nil {
-			if p, probeErr := mdb.Probe(path); probeErr == nil {
-				details = append(details, fmt.Sprintf("layout=%s pageSize=%d jetVersion=%d", p.LayoutClass, p.PageSize, p.JetVersion))
-				if !p.MSysObjectsReadable && p.MSysObjectsError != "" {
-					details = append(details, "catalog="+p.MSysObjectsError)
-				}
-			}
-		}
-	}
+	details = append(details, probeLayoutDetails(path)...)
 
 	if len(details) == 1 {
 		return details[0]
 	}
 
 	return fmt.Sprintf("%s (%s)", details[0], strings.Join(details[1:], "; "))
+}
+
+func probeLayoutDetails(path string) []string {
+	if path == "" {
+		return nil
+	}
+
+	_, statErr := os.Stat(path)
+	if statErr != nil {
+		return nil
+	}
+
+	p, probeErr := mdb.Probe(path)
+	if probeErr != nil {
+		return nil
+	}
+
+	details := []string{fmt.Sprintf("layout=%s pageSize=%d jetVersion=%d", p.LayoutClass, p.PageSize, p.JetVersion)}
+	if !p.MSysObjectsReadable && p.MSysObjectsError != "" {
+		details = append(details, "catalog="+p.MSysObjectsError)
+	}
+
+	return details
 }
 
 func extractionStats(modules []vba.ExtractedModule) (partialModules int, warningCount int) {

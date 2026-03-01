@@ -101,6 +101,7 @@ func TestSafeModuleName_illegalChars(t *testing.T) {
 		if strings.Contains(got, ch) {
 			t.Errorf("char %q not replaced in %q", ch, got)
 		}
+
 		if !strings.Contains(got, "_") {
 			t.Errorf("expected underscore replacement for %q, got %q", ch, got)
 		}
@@ -194,7 +195,8 @@ func TestPrintListTable_entry(t *testing.T) {
 func TestPrintListJSON_emptyList(t *testing.T) {
 	var buf bytes.Buffer
 
-	if err := printListJSON(&buf, []listEntry{}); err != nil {
+	err := printListJSON(&buf, []listEntry{})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -210,7 +212,8 @@ func TestPrintListJSON_entry(t *testing.T) {
 		{Name: "Mod1", Type: "standard", SizeBytes: 42},
 	}
 
-	if err := printListJSON(&buf, entries); err != nil {
+	err := printListJSON(&buf, entries)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -228,11 +231,15 @@ func TestComputeFileHash_returnsHex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.WriteString("test content"); err != nil {
+	_, err = f.WriteString("test content")
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	hash, err := computeFileHash(f.Name())
 	if err != nil {
@@ -249,9 +256,12 @@ func TestComputeFileHash_deterministicForSameContent(t *testing.T) {
 
 	writeFile := func(name, content string) string {
 		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+
+		err := os.WriteFile(path, []byte(content), 0o600)
+		if err != nil {
 			t.Fatal(err)
 		}
+
 		return path
 	}
 
@@ -271,9 +281,12 @@ func TestComputeFileHash_differsForDifferentContent(t *testing.T) {
 
 	writeFile := func(name, content string) string {
 		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+
+		err := os.WriteFile(path, []byte(content), 0o600)
+		if err != nil {
 			t.Fatal(err)
 		}
+
 		return path
 	}
 
@@ -300,7 +313,11 @@ func TestComputeFileHash_missingFile(t *testing.T) {
 func TestDiscoverInputFiles_singleFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.mdb")
-	os.WriteFile(path, []byte{}, 0o600)
+
+	err := os.WriteFile(path, []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile test.mdb: %v", err)
+	}
 
 	files, err := discoverInputFiles([]string{path}, false)
 	if err != nil {
@@ -314,8 +331,16 @@ func TestDiscoverInputFiles_singleFile(t *testing.T) {
 
 func TestDiscoverInputFiles_ignoresNonAccessFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "readme.txt"), []byte{}, 0o600)
-	os.WriteFile(filepath.Join(dir, "data.xlsx"), []byte{}, 0o600)
+
+	err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile readme.txt: %v", err)
+	}
+
+	err = os.WriteFile(filepath.Join(dir, "data.xlsx"), []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile data.xlsx: %v", err)
+	}
 
 	// Pass a non-Access file directly — it should be silently ignored
 	files, err := discoverInputFiles([]string{filepath.Join(dir, "readme.txt")}, false)
@@ -331,8 +356,16 @@ func TestDiscoverInputFiles_ignoresNonAccessFiles(t *testing.T) {
 func TestDiscoverInputFiles_recursive(t *testing.T) {
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
-	os.MkdirAll(sub, 0o755)
-	os.WriteFile(filepath.Join(sub, "deep.mdb"), []byte{}, 0o600)
+
+	err := os.MkdirAll(sub, 0o755)
+	if err != nil {
+		t.Fatalf("MkdirAll sub: %v", err)
+	}
+
+	err = os.WriteFile(filepath.Join(sub, "deep.mdb"), []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile deep.mdb: %v", err)
+	}
 
 	files, err := discoverInputFiles([]string{dir}, true)
 	if err != nil {
@@ -347,8 +380,16 @@ func TestDiscoverInputFiles_recursive(t *testing.T) {
 func TestDiscoverInputFiles_nonRecursiveSkipsDir(t *testing.T) {
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
-	os.MkdirAll(sub, 0o755)
-	os.WriteFile(filepath.Join(sub, "deep.mdb"), []byte{}, 0o600)
+
+	err := os.MkdirAll(sub, 0o755)
+	if err != nil {
+		t.Fatalf("MkdirAll sub: %v", err)
+	}
+
+	err = os.WriteFile(filepath.Join(sub, "deep.mdb"), []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile deep.mdb: %v", err)
+	}
 
 	files, err := discoverInputFiles([]string{dir}, false)
 	if err != nil {
@@ -363,7 +404,11 @@ func TestDiscoverInputFiles_nonRecursiveSkipsDir(t *testing.T) {
 func TestDiscoverInputFiles_deduplicates(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.mdb")
-	os.WriteFile(path, []byte{}, 0o600)
+
+	err := os.WriteFile(path, []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile test.mdb: %v", err)
+	}
 
 	files, err := discoverInputFiles([]string{path, path}, false)
 	if err != nil {

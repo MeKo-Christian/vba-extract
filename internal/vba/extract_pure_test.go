@@ -53,6 +53,7 @@ func TestExtractModuleSource_offsetBeyondData_noContainer(t *testing.T) {
 	_, warnings, _ := extractModuleSource(m, slog.New(slog.DiscardHandler))
 
 	found := false
+
 	for _, w := range warnings {
 		if strings.Contains(w, "exceeds") {
 			found = true
@@ -87,6 +88,7 @@ func TestExtractModuleSource_validOVBAContainer(t *testing.T) {
 
 func TestBruteForceOffsetScan_noContainer(t *testing.T) {
 	data := []byte("no compressed container here at all")
+
 	_, ok := bruteForceOffsetScan(data)
 	if ok {
 		t.Error("expected false when no valid compressed container found")
@@ -116,6 +118,7 @@ func TestBruteForceOffsetScan_withVBAContainer(t *testing.T) {
 
 func TestRecoverPartialFromRaw_noFragments(t *testing.T) {
 	raw := []byte{0x00, 0x01, 0x02, 0x03, 0xFF}
+
 	text, warnings, partial := recoverPartialFromRaw(raw, nil)
 	if text != "" {
 		t.Errorf("expected empty text for unrecoverable raw data, got: %q", text)
@@ -126,6 +129,7 @@ func TestRecoverPartialFromRaw_noFragments(t *testing.T) {
 	}
 
 	hasWarning := false
+
 	for _, w := range warnings {
 		if strings.Contains(w, "no recoverable") {
 			hasWarning = true

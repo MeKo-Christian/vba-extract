@@ -8,7 +8,10 @@ import (
 
 func TestLegacyFixtureFromSQLServerBackup(t *testing.T) {
 	path := filepath.Join("..", "..", "testdata", "jet35", "st990426.mdb")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
 		t.Skipf("legacy fixture not present: %s", path)
 	}
 

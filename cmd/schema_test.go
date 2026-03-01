@@ -191,6 +191,7 @@ func TestRenderMarkdown_emptySchema(t *testing.T) {
 func TestWriteTableMarkdown_empty(t *testing.T) {
 	var b strings.Builder
 	writeTableMarkdown(&b, nil)
+
 	if b.Len() != 0 {
 		t.Errorf("expected no output for nil tables, got: %q", b.String())
 	}
@@ -249,6 +250,7 @@ func TestWriteTableMarkdown_dashForZeroSize(t *testing.T) {
 func TestWriteRelationshipMarkdown_empty(t *testing.T) {
 	var b strings.Builder
 	writeRelationshipMarkdown(&b, nil)
+
 	if b.Len() != 0 {
 		t.Errorf("expected no output for nil relationships, got: %q", b.String())
 	}
@@ -305,6 +307,7 @@ func TestWriteRelationshipMarkdown_cascadeAnnotations(t *testing.T) {
 func TestWriteQueryMarkdown_empty(t *testing.T) {
 	var b strings.Builder
 	writeQueryMarkdown(&b, nil)
+
 	if b.Len() != 0 {
 		t.Errorf("expected no output for nil queries, got: %q", b.String())
 	}

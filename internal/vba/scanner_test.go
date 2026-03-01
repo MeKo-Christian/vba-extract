@@ -5,7 +5,7 @@ import (
 )
 
 func TestScanOrphanedLvalModules_returnsNoError(t *testing.T) {
-	// Start.mdb has a proper MSysAccessStorage so orphaned scan should return
+	// sample.mdb has a proper MSysAccessStorage so orphaned scan should return
 	// empty (all modules are reachable via normal path), but must not error.
 	db := testDB(t)
 

@@ -27,7 +27,7 @@ Expert-level guidance for AI coding agents working on the `vba-extract` project.
 ### 3. Testing
 
 - **Unit Tests**: Most packages have extensive `_test.go` files. Run with `go test ./...`.
-- **Integration Tests**: Rely on `testdata/`. `testdata/Start.mdb` is the primary test fixture.
+- **Integration Tests**: Rely on `testdata/`. `testdata/sample.mdb` is the primary test fixture.
 - **Fixtures**: Use `VBA_FIXTURE_DIR` environment variable to point to a local collection of real `.mdb` files for broader testing.
 
 ### 4. Code Style
@@ -37,7 +37,7 @@ Expert-level guidance for AI coding agents working on the `vba-extract` project.
 
 ## Common Developer Workflows
 
-- **Run CLI**: `go run . extract --verbose testdata/Start.mdb`
+- **Run CLI**: `go run . extract --verbose testdata/sample.mdb`
 - **Rebuild**: `just build` (if `justfile` is used) or `go build -o vba-extract .`
 - **Check Coverage**: `go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out`
 

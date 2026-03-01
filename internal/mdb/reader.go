@@ -43,9 +43,11 @@ const (
 
 var magicBytes = [4]byte{0x00, 0x01, 0x00, 0x00}
 
-var ErrJet3TableLayoutUnsupported = errors.New("mdb: Jet 3.5 table layout parsing is not implemented")
-var ErrJet3RowLayoutUnsupported = errors.New("mdb: Jet 3.5 row layout parsing is not implemented")
-var ErrJet3LvalLayoutUnsupported = errors.New("mdb: Jet 3.5 LVAL/MEMO parsing is not implemented")
+var (
+	ErrJet3TableLayoutUnsupported = errors.New("mdb: Jet 3.5 table layout parsing is not implemented")
+	ErrJet3RowLayoutUnsupported   = errors.New("mdb: Jet 3.5 row layout parsing is not implemented")
+	ErrJet3LvalLayoutUnsupported  = errors.New("mdb: Jet 3.5 LVAL/MEMO parsing is not implemented")
+)
 
 // Header holds parsed database header fields from page 0.
 type Header struct {
@@ -218,6 +220,7 @@ func looksLikePageLayout(f *os.File, fileSize int64, pageSize int64) bool {
 
 	// A valid database should have MSysObjects TDEF on page 2.
 	page2Type := make([]byte, 1)
+
 	_, err := f.ReadAt(page2Type, 2*pageSize)
 	if err != nil && err != io.EOF {
 		return false
@@ -228,6 +231,7 @@ func looksLikePageLayout(f *os.File, fileSize int64, pageSize int64) bool {
 	}
 
 	page1Type := make([]byte, 1)
+
 	_, err = f.ReadAt(page1Type, pageSize)
 	if err != nil && err != io.EOF {
 		return false

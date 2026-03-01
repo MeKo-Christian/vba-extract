@@ -3,7 +3,9 @@ package mdb
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf16"
 )
@@ -27,8 +29,8 @@ var (
 
 	// Access form blob image record header: property 0x018E, type 0x0B (image),
 	// flags 0xFFFF, followed by a 4-byte LE image data size.
-	// Pattern: 8e 01 00 00 3e 02 0b 00 00 00 00 00 ff ff [size LE32]
-	// We match the tail: 3e 02 0b 00 00 00 00 00 ff ff
+	// Pattern: 8e 01 00 3e 02 0b 00 0xFF [size LE32]
+	// We match the tail: 3e 02 0b 00 00 00 00 00 and two trailing 0xFF bytes.
 	sigImageRecordTail = []byte{0x3e, 0x02, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff}
 )
 
@@ -107,6 +109,7 @@ func fileNameStem(name string) string {
 			return name[:i]
 		}
 	}
+
 	return name
 }
 
@@ -116,6 +119,7 @@ func fnvHash(data []byte) uint64 {
 		h ^= uint64(b)
 		h *= 1099511628211
 	}
+
 	return h
 }
 
@@ -162,21 +166,27 @@ func loadFormStorageTree(db *Database) (*formStorageTree, error) {
 		if v, ok := row["Id"].(int32); ok {
 			e.id = v
 		}
+
 		if v, ok := row["ParentId"].(int32); ok {
 			e.parentID = v
 		}
+
 		if v, ok := row["Name"].(string); ok {
 			e.name = v
 		}
+
 		if v, ok := row["Lv"].([]byte); ok {
 			e.lvRaw = v
 		}
+
 		if e.id == 0 {
 			continue
 		}
+
 		if e.parentID == e.id {
 			e.parentID = 0
 		}
+
 		entries = append(entries, e)
 		idToEntry[e.id] = &entries[len(entries)-1]
 	}
@@ -198,7 +208,7 @@ func loadFormStorageTree(db *Database) (*formStorageTree, error) {
 	}
 
 	if formsID == 0 {
-		return nil, fmt.Errorf("image: Forms folder not found in MSysAccessStorage")
+		return nil, errors.New("image: Forms folder not found in MSysAccessStorage")
 	}
 
 	tree := &formStorageTree{
@@ -207,6 +217,7 @@ func loadFormStorageTree(db *Database) (*formStorageTree, error) {
 
 	// Collect form folders (direct children of Forms) and their children.
 	formFolders := map[int32]string{} // ID -> folder name
+
 	for i := range entries {
 		if entries[i].parentID == formsID {
 			name := entries[i].name
@@ -215,11 +226,14 @@ func loadFormStorageTree(db *Database) (*formStorageTree, error) {
 				if err == nil && len(data) > 0 {
 					tree.dirData = data
 				}
+
 				continue
 			}
+
 			if name == "PropData" {
 				continue
 			}
+
 			formFolders[entries[i].id] = name
 		}
 	}
@@ -230,6 +244,7 @@ func loadFormStorageTree(db *Database) (*formStorageTree, error) {
 		if !ok {
 			continue
 		}
+
 		node := formNode{name: entries[i].name}
 		if len(entries[i].lvRaw) > 0 {
 			data, err := resolveIfNeeded(db, entries[i].lvRaw)
@@ -237,6 +252,7 @@ func loadFormStorageTree(db *Database) (*formStorageTree, error) {
 				node.data = data
 			}
 		}
+
 		tree.children[folderName] = append(tree.children[folderName], node)
 	}
 
@@ -247,6 +263,7 @@ func resolveIfNeeded(db *Database, lvRaw []byte) ([]byte, error) {
 	if len(lvRaw) == 0 {
 		return nil, nil
 	}
+
 	return db.ResolveMemo(lvRaw)
 }
 
@@ -294,6 +311,7 @@ func parseFormDirData(tree *formStorageTree) map[string]string {
 			i++
 			continue
 		}
+
 		i++ // skip 0x04 marker
 
 		entryLen := int(d[i])
@@ -312,7 +330,7 @@ func parseFormDirData(tree *formStorageTree) map[string]string {
 
 		name := decodeUTF16LE(nameBytes)
 
-		result[fmt.Sprintf("%d", folderIndex)] = name
+		result[strconv.FormatUint(uint64(folderIndex), 10)] = name
 	}
 
 	return result
@@ -322,10 +340,12 @@ func decodeUTF16LE(b []byte) string {
 	if len(b) < 2 {
 		return ""
 	}
+
 	u16 := make([]uint16, len(b)/2)
 	for i := range u16 {
 		u16[i] = binary.LittleEndian.Uint16(b[i*2:])
 	}
+
 	return string(utf16.Decode(u16))
 }
 
@@ -340,6 +360,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 		if idx < 0 {
 			break
 		}
+
 		pos := off + idx
 		if seen[pos] {
 			off = pos + 3
@@ -355,6 +376,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 			// nested JPEGs (e.g. Photoshop thumbnails inside APP13 segments).
 			size = jpegSizeByMarkerPairing(data, pos)
 		}
+
 		if size <= 0 {
 			off = pos + 3
 			continue
@@ -380,6 +402,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 		if idx < 0 {
 			break
 		}
+
 		pos := off + idx
 		if seen[pos] {
 			off = pos + 8
@@ -388,6 +411,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 
 		// PNG ends with IEND chunk.
 		iend := []byte{0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82}
+
 		endIdx := bytes.Index(data[pos:], iend)
 		if endIdx < 0 {
 			off = pos + 8
@@ -416,6 +440,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 			if idx < 0 {
 				break
 			}
+
 			pos := off + idx
 			if seen[pos] {
 				off = pos + 6
@@ -451,6 +476,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 		if idx < 0 {
 			break
 		}
+
 		pos := off + idx
 		if seen[pos] {
 			off = pos + 2
@@ -461,6 +487,7 @@ func scanBlobForImages(data []byte, formName string) []EmbeddedImage {
 		if pos+6 > len(data) {
 			break
 		}
+
 		bmpSize := int(binary.LittleEndian.Uint32(data[pos+2:]))
 
 		// Sanity check: BMP size should be reasonable and fit in the blob.
@@ -497,6 +524,7 @@ func findFilename(data []byte, imageOffset int) string {
 	extensions := []string{".jpg", ".jpeg", ".png", ".bmp", ".gif"}
 	for _, ext := range extensions {
 		extBytes := encodeUTF16LE(ext)
+
 		idx := bytes.LastIndex(region, extBytes)
 		if idx < 0 {
 			continue
@@ -504,12 +532,14 @@ func findFilename(data []byte, imageOffset int) string {
 
 		// Walk backwards from the extension to find the start of the filename.
 		nameEnd := idx + len(extBytes)
+
 		nameStart := idx
 		for nameStart >= 2 {
 			ch := uint16(region[nameStart-2]) | uint16(region[nameStart-1])<<8
 			if ch == 0 || ch < 0x20 {
 				break
 			}
+
 			nameStart -= 2
 		}
 
@@ -527,7 +557,7 @@ func findFilename(data []byte, imageOffset int) string {
 // jpegSizeFromRecordHeader reads the image size from the Access form blob
 // record header that precedes a JPEG. The header pattern is:
 //
-//	... 3e 02 0b 00 00 00 00 00 ff ff [size LE32] [FFD8FF...]
+//	... 3e 02 0b 00 0xFF [size LE32] [JPEG start marker...]
 //
 // Returns 0 if no valid header is found.
 func jpegSizeFromRecordHeader(data []byte, jpegOffset int) int {
@@ -537,6 +567,7 @@ func jpegSizeFromRecordHeader(data []byte, jpegOffset int) int {
 	if headerEnd < 14 {
 		return 0
 	}
+
 	sizeBytes := data[headerEnd-4 : headerEnd]
 	tailBytes := data[headerEnd-14 : headerEnd-4]
 
@@ -583,6 +614,7 @@ func jpegSizeByMarkerPairing(data []byte, jpegOffset int) int {
 			// Found a nested FFD8 before the next FFD9.
 			depth++
 			pos = nextStart + 3
+
 			continue
 		}
 
@@ -591,6 +623,7 @@ func jpegSizeByMarkerPairing(data []byte, jpegOffset int) int {
 		if depth == 0 {
 			return nextEnd + 2 - jpegOffset
 		}
+
 		pos = nextEnd + 2
 	}
 
@@ -600,10 +633,12 @@ func jpegSizeByMarkerPairing(data []byte, jpegOffset int) int {
 func encodeUTF16LE(s string) []byte {
 	runes := []rune(s)
 	u16 := utf16.Encode(runes)
+
 	b := make([]byte, len(u16)*2)
 	for i, v := range u16 {
 		b[i*2] = byte(v)
 		b[i*2+1] = byte(v >> 8)
 	}
+
 	return b
 }

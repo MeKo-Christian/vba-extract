@@ -69,7 +69,7 @@ var extractCmd = &cobra.Command{
 				continue
 			}
 
-			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat || format == "flat", extractOverwriteReadme)
+			count, lines, writeErr := writeModules(baseOut, file, modules, extractFlat || format == outputFormatFlat, extractOverwriteReadme)
 			if writeErr != nil {
 				failed++
 

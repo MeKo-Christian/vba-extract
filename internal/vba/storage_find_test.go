@@ -63,7 +63,7 @@ func TestFindLikelyProjectNode_noMatchingNodes(t *testing.T) {
 	}
 }
 
-// findLikelyDirNode – uses the real Start.mdb storage tree which contains
+// findLikelyDirNode – uses the real sample.mdb storage tree which contains
 // an actual dir stream, exercising the decompression-based node detection.
 
 func TestFindLikelyDirNode_withRealFixture(t *testing.T) {
@@ -77,7 +77,7 @@ func TestFindLikelyDirNode_withRealFixture(t *testing.T) {
 	// The real database has a dir stream; findLikelyDirNode should find it.
 	got := st.findLikelyDirNode()
 	if got == nil {
-		t.Fatal("expected findLikelyDirNode to find dir stream in Start.mdb")
+		t.Fatal("expected findLikelyDirNode to find dir stream in sample.mdb")
 	}
 }
 

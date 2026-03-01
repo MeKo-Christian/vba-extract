@@ -28,8 +28,11 @@ func TestProbeClassifiesSyntheticJet32K(t *testing.T) {
 }
 
 func TestProbeClassifiesStartMDBAsJet44K(t *testing.T) {
-	path := filepath.Join("..", "..", "testdata", "Start.mdb")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	path := filepath.Join("..", "..", "testdata", "sample.mdb")
+
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
 		t.Skipf("fixture not present: %s", path)
 	}
 
@@ -49,7 +52,10 @@ func TestProbeClassifiesStartMDBAsJet44K(t *testing.T) {
 
 func TestProbeClassifiesLegacyFixtureAsLegacy4K(t *testing.T) {
 	path := filepath.Join("..", "..", "testdata", "jet35", "st990426.mdb")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
 		t.Skipf("fixture not present: %s", path)
 	}
 

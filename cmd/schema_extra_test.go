@@ -19,18 +19,21 @@ func TestWriteSchema_createsFiles(t *testing.T) {
 		},
 	}
 
-	if err := writeSchema(dir, filepath.Join("/data", "mydb.accdb"), s, false, false); err != nil {
+	err := writeSchema(dir, filepath.Join("/data", "mydb.accdb"), s, false, false)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	sqlFile := filepath.Join(dir, "mydb", "mydb.schema.sql")
 	mdFile := filepath.Join(dir, "mydb", "mydb.schema.md")
 
-	if _, err := os.Stat(sqlFile); err != nil {
+	_, err = os.Stat(sqlFile)
+	if err != nil {
 		t.Errorf("expected .sql file: %v", err)
 	}
 
-	if _, err := os.Stat(mdFile); err != nil {
+	_, err = os.Stat(mdFile)
+	if err != nil {
 		t.Errorf("expected .md file: %v", err)
 	}
 }
@@ -39,13 +42,16 @@ func TestWriteSchema_flatMode(t *testing.T) {
 	dir := t.TempDir()
 	s := &mdb.Schema{}
 
-	if err := writeSchema(dir, "/data/mydb.mdb", s, true, false); err != nil {
+	err := writeSchema(dir, "/data/mydb.mdb", s, true, false)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// In flat mode files go directly into dir, not a subdirectory
 	sqlFile := filepath.Join(dir, "mydb.schema.sql")
-	if _, err := os.Stat(sqlFile); err != nil {
+
+	_, err = os.Stat(sqlFile)
+	if err != nil {
 		t.Errorf("expected .sql directly in base dir: %v", err)
 	}
 }
@@ -58,7 +64,8 @@ func TestWriteSchema_sqlFileContainsDDL(t *testing.T) {
 		},
 	}
 
-	if err := writeSchema(dir, "/db/shop.mdb", s, true, false); err != nil {
+	err := writeSchema(dir, "/db/shop.mdb", s, true, false)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -80,7 +87,8 @@ func TestWriteSchema_mdFileContainsMarkdown(t *testing.T) {
 		},
 	}
 
-	if err := writeSchema(dir, "/db/orders.mdb", s, true, false); err != nil {
+	err := writeSchema(dir, "/db/orders.mdb", s, true, false)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

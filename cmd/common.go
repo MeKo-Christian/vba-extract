@@ -24,6 +24,13 @@ type listEntry struct {
 	Partial   bool   `json:"partial"`
 }
 
+const (
+	moduleExtClass    = ".cls"
+	moduleExtStandard = ".bas"
+	unnamedModuleName = "unnamed"
+	outputFormatFlat  = "flat"
+)
+
 func discoverInputFiles(args []string, recursive bool) ([]string, error) {
 	seen := map[string]struct{}{}
 	var files []string
@@ -176,16 +183,16 @@ func loadModules(path string) ([]vba.ExtractedModule, error) {
 
 func moduleExt(moduleType vba.ProjectModuleType) string {
 	if moduleType == vba.ProjectModuleClass || moduleType == vba.ProjectModuleDocument {
-		return ".cls"
+		return moduleExtClass
 	}
 
-	return ".bas"
+	return moduleExtStandard
 }
 
 func safeModuleName(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "unnamed"
+		return unnamedModuleName
 	}
 
 	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
@@ -223,7 +230,8 @@ func writeModules(baseOutDir, dbPath string, modules []vba.ExtractedModule, flat
 		totalLines += strings.Count(module.Text, "\n")
 	}
 
-	if err := writeModuleReadme(targetDir, dbPath, modules, overwriteReadme); err != nil {
+	err = writeModuleReadme(targetDir, dbPath, modules, overwriteReadme)
+	if err != nil {
 		return written, totalLines, err
 	}
 
@@ -234,7 +242,8 @@ func writeModuleReadme(targetDir, dbPath string, modules []vba.ExtractedModule, 
 	readmePath := filepath.Join(targetDir, "README.md")
 
 	if !overwrite {
-		if _, err := os.Stat(readmePath); err == nil {
+		_, err := os.Stat(readmePath)
+		if err == nil {
 			return nil
 		}
 	}
@@ -248,6 +257,7 @@ func writeModuleReadme(targetDir, dbPath string, modules []vba.ExtractedModule, 
 
 	if len(modules) > 0 {
 		fmt.Fprintf(&b, "\n## Modules\n\n")
+
 		for _, m := range modules {
 			ext := strings.TrimPrefix(moduleExt(m.Type), ".")
 			fmt.Fprintf(&b, "- %s (%s)\n", m.Name, ext)

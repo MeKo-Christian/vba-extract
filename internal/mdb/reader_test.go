@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-const testMDB = "../../testdata/Start.mdb"
+const testMDB = "../../testdata/sample.mdb"
 
 func testDB(t *testing.T) *Database {
 	t.Helper()
 
 	_, err := os.Stat(testMDB)
 	if os.IsNotExist(err) {
-		t.Skip("testdata/Start.mdb not available")
+		t.Skip("testdata/sample.mdb not available")
 	}
 
 	db, err := Open(testMDB)
@@ -32,7 +32,7 @@ func TestOpenAndHeader(t *testing.T) {
 		t.Errorf("DBName = %q, want %q", db.Header.DBName, "Standard ACE DB")
 	}
 
-	// Start.mdb is Access 2007+ format (version 3 = ACE12).
+	// sample.mdb is Access 2007+ format (version 3 = ACE12).
 	if db.Header.JetVersion != JetVersionACE {
 		t.Errorf("JetVersion = %d, want %d (ACE12)", db.Header.JetVersion, JetVersionACE)
 	}

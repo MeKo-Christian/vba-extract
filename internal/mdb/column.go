@@ -233,6 +233,7 @@ func (td *TableDef) parseRowJet3(data []byte, sortedCols []*Column) (Row, error)
 
 	bitmaskLen := (rowCols + 7) / 8
 	rowEnd := len(data) - 1
+
 	nullMaskStart := rowEnd - bitmaskLen + 1
 	if nullMaskStart < 1 || nullMaskStart > len(data) {
 		return nil, errors.New("mdb: Jet3 row too short for null mask")
@@ -241,6 +242,7 @@ func (td *TableDef) parseRowJet3(data []byte, sortedCols []*Column) (Row, error)
 	nullMask := data[nullMaskStart:]
 
 	hasVarCols := false
+
 	for _, col := range sortedCols {
 		if !col.IsFixed() {
 			hasVarCols = true
@@ -282,6 +284,7 @@ func (td *TableDef) parseRowJet3(data []byte, sortedCols []*Column) (Row, error)
 		}
 
 		byteIdx := colIdx / 8
+
 		bitMask := byte(1 << (colIdx % 8))
 		if byteIdx >= len(nullMask) || nullMask[byteIdx]&bitMask == 0 {
 			row[col.Name] = nil
@@ -296,6 +299,7 @@ func (td *TableDef) parseRowJet3(data []byte, sortedCols []*Column) (Row, error)
 
 			row[col.Name] = readFixedColumn(data, col, 1)
 			fixedColsFound++
+
 			continue
 		}
 
@@ -310,6 +314,7 @@ func crackJet3VarOffsets(row []byte, rowVarCols, bitmaskLen int) ([]int, error) 
 	rowEnd := len(row) - 1
 	rowLen := len(row)
 	numJumps := (rowLen - 1) / 256
+
 	colPtr := rowEnd - bitmaskLen - numJumps - 1
 	if colPtr < 0 {
 		return nil, errors.New("mdb: Jet3 row too short for variable offset table")
@@ -323,7 +328,7 @@ func crackJet3VarOffsets(row []byte, rowVarCols, bitmaskLen int) ([]int, error) 
 	offsets := make([]int, rowVarCols+1)
 	jumpsUsed := 0
 
-	for i := 0; i < rowVarCols+1; i++ {
+	for i := range rowVarCols + 1 {
 		for jumpsUsed < numJumps {
 			jumpIdx := rowEnd - bitmaskLen - jumpsUsed - 1
 			if jumpIdx < 0 || jumpIdx >= len(row) {
@@ -355,6 +360,7 @@ func readVarColumnJet3(data []byte, col *Column, varOffsets []int, rowVarCols in
 	}
 
 	start := varOffsets[idx]
+
 	end := varOffsets[idx+1]
 	if start < 0 || end < 0 || start >= end || start >= len(data) || end > len(data) {
 		return nil

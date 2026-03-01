@@ -98,11 +98,6 @@ func decodeLvalPageAndRow(raw []byte) (int64, int) {
 	return pageNum, rowID
 }
 
-// readLvalRecord reads a single record from an LVAL page.
-func (db *Database) readLvalRecord(pageNum int64, rowID int, maxLen int) ([]byte, error) {
-	return db.readLvalRecordWithLayout(pageNum, rowID, maxLen, dataNumRows, dataRowTable)
-}
-
 func (db *Database) readLvalRecordWithLayout(pageNum int64, rowID int, maxLen int, numRowsOff, rowTableOff int) ([]byte, error) {
 	page, err := db.ReadPage(pageNum)
 	if err != nil {
@@ -162,11 +157,6 @@ func (db *Database) ReadLvalChain(pageNum int64, rowID int, maxLen int) ([]byte,
 	numRowsOff, rowTableOff := dataPageLayoutOffsets(db)
 
 	return db.readLvalChainWithLayout(pageNum, rowID, effective, numRowsOff, rowTableOff)
-}
-
-// readLvalChain reads a multi-page LVAL chain.
-func (db *Database) readLvalChain(pageNum int64, rowID int, totalLen int) ([]byte, error) {
-	return db.readLvalChainWithLayout(pageNum, rowID, totalLen, dataNumRows, dataRowTable)
 }
 
 func (db *Database) readLvalChainWithLayout(pageNum int64, rowID int, totalLen int, numRowsOff, rowTableOff int) ([]byte, error) {

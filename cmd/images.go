@@ -47,6 +47,7 @@ var imagesCmd = &cobra.Command{
 						slog.Default().Debug("skip duplicate", "file", file, "sameAs", prev)
 						continue
 					}
+
 					seenHashes[hash] = file
 				}
 			}
@@ -56,10 +57,13 @@ var imagesCmd = &cobra.Command{
 			images, loadErr := loadImages(file)
 			if loadErr != nil {
 				failed++
+
 				fmt.Fprintf(out, "%s %s: %s\n", colorize("31", "ERROR"), filepath.Base(file), formatCommandError(file, loadErr))
+
 				if imagesStrict {
 					return loadErr
 				}
+
 				continue
 			}
 
@@ -68,13 +72,16 @@ var imagesCmd = &cobra.Command{
 				continue
 			}
 
-			count, writeErr := writeImages(baseOut, file, images, imagesFlat || format == "flat")
+			count, writeErr := writeImages(baseOut, file, images, imagesFlat || format == outputFormatFlat)
 			if writeErr != nil {
 				failed++
+
 				fmt.Fprintf(out, "%s %s: %s\n", colorize("31", "ERROR"), filepath.Base(file), formatCommandError(file, writeErr))
+
 				if imagesStrict {
 					return writeErr
 				}
+
 				continue
 			}
 
@@ -126,6 +133,7 @@ func writeImages(baseOutDir, dbPath string, images []mdb.EmbeddedImage, flat boo
 		if err != nil {
 			return written, fmt.Errorf("write %q: %w", outPath, err)
 		}
+
 		written++
 	}
 
@@ -158,6 +166,7 @@ func imageFilename(img mdb.EmbeddedImage, usedNames map[string]int) string {
 		usedNames[strings.ToLower(name)] = n + 1
 		name = fmt.Sprintf("%s_%d%s", base, n+1, ext)
 	}
+
 	usedNames[strings.ToLower(name)] = 1
 
 	return name

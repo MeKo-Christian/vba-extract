@@ -7,7 +7,7 @@ import (
 )
 
 func TestReadSchemaFromStartMDB(t *testing.T) {
-	db, err := Open(filepath.Join("..", "..", "testdata", "Start.mdb"))
+	db, err := Open(filepath.Join("..", "..", "testdata", "sample.mdb"))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

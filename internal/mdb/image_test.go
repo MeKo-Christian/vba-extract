@@ -8,7 +8,7 @@ import (
 )
 
 func TestExtractImages_StartMDB(t *testing.T) {
-	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
+	dbPath := filepath.Join("..", "..", "testdata", "sample.mdb")
 
 	db, err := mdb.Open(dbPath)
 	if err != nil {
@@ -25,11 +25,12 @@ func TestExtractImages_StartMDB(t *testing.T) {
 		t.Fatalf("expected 2 images, got %d", len(images))
 	}
 
-	// All images in Start.mdb are JPEGs.
+	// All images in sample.mdb are JPEGs.
 	for i, img := range images {
 		if img.Format != "jpeg" {
 			t.Errorf("image[%d]: expected format jpeg, got %s", i, img.Format)
 		}
+
 		if len(img.Data) < 1000 {
 			t.Errorf("image[%d]: suspiciously small (%d bytes)", i, len(img.Data))
 		}
@@ -48,20 +49,24 @@ func TestExtractImages_StartMDB(t *testing.T) {
 	for _, img := range images {
 		formNames[img.FormName] = true
 	}
+
 	if !formNames["Startschirm"] {
 		t.Error("expected form name 'Startschirm' in results")
 	}
 
 	// Check that filenames were extracted for the images that have them.
 	foundFilename := false
+
 	for _, img := range images {
 		if img.FileName != "" {
 			foundFilename = true
+
 			if img.FileName != "MicrosoftTeams-image (55).jpg" && img.FileName != "MicrosoftTeams-image (55).png" {
 				t.Errorf("unexpected filename: %q", img.FileName)
 			}
 		}
 	}
+
 	if !foundFilename {
 		t.Error("expected at least one image with an extracted filename")
 	}
@@ -76,7 +81,8 @@ func TestScanBlobForImages_NoImages(t *testing.T) {
 	// Make sure it doesn't accidentally contain JPEG/PNG/BMP/GIF signatures.
 	// The loop above produces 0xFF at index 255, 0xD8 at index 216 — not adjacent.
 
-	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
+	dbPath := filepath.Join("..", "..", "testdata", "sample.mdb")
+
 	db, err := mdb.Open(dbPath)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -90,13 +96,14 @@ func TestScanBlobForImages_NoImages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExtractImages: %v", err)
 	}
+
 	if images == nil {
 		t.Fatal("expected non-nil result")
 	}
 }
 
 func TestExtractImages_ImageSizes(t *testing.T) {
-	dbPath := filepath.Join("..", "..", "testdata", "Start.mdb")
+	dbPath := filepath.Join("..", "..", "testdata", "sample.mdb")
 
 	db, err := mdb.Open(dbPath)
 	if err != nil {

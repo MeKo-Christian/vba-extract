@@ -51,13 +51,14 @@ func Probe(path string) (*ProbeResult, error) {
 		result.MSysObjectsTDEF = PageType(pg2) == PageTypeTDEF
 	}
 
-	if db.PageSize() == PageSizeJet3 {
+	switch {
+	case db.PageSize() == PageSizeJet3:
 		result.LayoutClass = LayoutJet32K
-	} else if db.Header.JetVersion == JetVersion3 || db.Header.JetVersion == 259 {
+	case db.Header.JetVersion == JetVersion3 || db.Header.JetVersion == 259:
 		result.LayoutClass = LayoutLegacy4
-	} else if db.PageSize() == PageSizeJet4 {
+	case db.PageSize() == PageSizeJet4:
 		result.LayoutClass = LayoutJet44K
-	} else {
+	default:
 		result.LayoutClass = LayoutUnknown
 	}
 
@@ -69,10 +70,8 @@ func Probe(path string) (*ProbeResult, error) {
 	}
 
 	const maxSamplePages = 64
-	limit := int(db.PageCount())
-	if limit > maxSamplePages {
-		limit = maxSamplePages
-	}
+
+	limit := min(int(db.PageCount()), maxSamplePages)
 
 	result.SampleScannedPages = limit
 	for i := 1; i < limit; i++ {

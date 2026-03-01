@@ -151,12 +151,12 @@ Use `--output-dir` to specify the root directory, and `--flat` to skip the per-d
 
 ## Supported formats
 
-| Format              | Extension | Engine / Layout          | Status |
-| ------------------- | --------- | ------------------------ | ------ |
-| Access 97           | `.mdb`    | Jet 3.x (`jet3-2k`)      | Partial: parser paths, memo/LVAL, and VBA extraction are implemented; broader fixture coverage is still in progress |
-| Legacy header `.mdb`| `.mdb`    | non-standard Jet header + 4K pages (`legacy-4k`) | Supported via layout probing |
-| Access 2000 – 2003  | `.mdb`    | Jet 4.0 (`jet4-4k`)      | Supported |
-| Access 2007 – 2019+ | `.accdb`  | ACE (`jet4-4k`)          | Supported |
+| Format               | Extension | Engine / Layout                                  | Status                                                                                                              |
+| -------------------- | --------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Access 97            | `.mdb`    | Jet 3.x (`jet3-2k`)                              | Partial: parser paths, memo/LVAL, and VBA extraction are implemented; broader fixture coverage is still in progress |
+| Legacy header `.mdb` | `.mdb`    | non-standard Jet header + 4K pages (`legacy-4k`) | Supported via layout probing                                                                                        |
+| Access 2000 – 2003   | `.mdb`    | Jet 4.0 (`jet4-4k`)                              | Supported                                                                                                           |
+| Access 2007 – 2019+  | `.accdb`  | ACE (`jet4-4k`)                                  | Supported                                                                                                           |
 
 ## Current limitations
 
@@ -188,8 +188,8 @@ go test ./internal/vba -run TestExtractAllModulesFromLegacyFixture
 go test ./cmd -run TestLoadSchema_legacyFixture
 
 # Run with verbose output on a test file
-go run . extract --verbose testdata/Start.mdb
-go run . schema testdata/Start.mdb
+go run . extract --verbose testdata/sample.mdb
+go run . schema testdata/sample.mdb
 ```
 
 Test fixtures live in `testdata/`. Set `VBA_FIXTURE_DIR` to point at a directory of real `.mdb` files for integration testing against production data.

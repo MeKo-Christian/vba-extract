@@ -45,7 +45,7 @@ func TestTableNames(t *testing.T) {
 
 	t.Logf("Tables: %v", names)
 
-	// Start.mdb should have these user tables.
+	// sample.mdb should have these user tables.
 	wantTables := []string{"Module", "SYStabEinstellungen"}
 	for _, want := range wantTables {
 		found := slices.Contains(names, want)

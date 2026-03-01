@@ -47,6 +47,7 @@ func writeSyntheticJet3ScannerDB(t *testing.T, chainData []byte) string {
 	_, err = f.Write(data)
 	if err != nil {
 		_ = f.Close()
+
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -61,8 +62,11 @@ func writeSyntheticJet3ScannerDB(t *testing.T, chainData []byte) string {
 func pickRecoverableModuleChainData(t *testing.T) ([]byte, string) {
 	t.Helper()
 
-	start := filepath.Join("..", "..", "testdata", "Start.mdb")
-	if _, err := os.Stat(start); os.IsNotExist(err) {
+	start := filepath.Join("..", "..", "testdata", "sample.mdb")
+
+	_, err := os.Stat(start)
+
+	if os.IsNotExist(err) {
 		t.Skipf("fixture not present: %s", start)
 	}
 
@@ -93,7 +97,8 @@ func pickRecoverableModuleChainData(t *testing.T) ([]byte, string) {
 		}
 	}
 
-	t.Skip("no recoverable module stream found in Start.mdb fixture")
+	t.Skip("no recoverable module stream found in sample.mdb fixture")
+
 	return nil, ""
 }
 
@@ -121,6 +126,7 @@ func TestScanOrphanedLvalModules_Jet3LayoutSynthetic(t *testing.T) {
 	}
 
 	found := false
+
 	for _, m := range modules {
 		if m.Name == expectedName {
 			found = true

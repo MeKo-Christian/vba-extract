@@ -70,6 +70,7 @@ func TestReadTableDefJet3Synthetic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	if !db.IsJet3() {

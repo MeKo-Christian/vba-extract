@@ -5,13 +5,14 @@ import (
 	"testing"
 )
 
-const testMDB = "../testdata/Start.mdb"
+const testMDB = "../testdata/sample.mdb"
 
 func skipIfNoFixture(t *testing.T) {
 	t.Helper()
 
-	if _, err := os.Stat(testMDB); os.IsNotExist(err) {
-		t.Skip("testdata/Start.mdb not available")
+	_, err := os.Stat(testMDB)
+	if os.IsNotExist(err) {
+		t.Skip("testdata/sample.mdb not available")
 	}
 }
 
@@ -26,7 +27,7 @@ func TestLoadModules_returnsModules(t *testing.T) {
 	}
 
 	if len(modules) == 0 {
-		t.Fatal("expected at least one module from Start.mdb")
+		t.Fatal("expected at least one module from sample.mdb")
 	}
 }
 
@@ -81,6 +82,7 @@ func TestLoadImages_returnsImages(t *testing.T) {
 		if img.Format != "jpeg" {
 			t.Errorf("image[%d]: expected jpeg, got %s", i, img.Format)
 		}
+
 		if len(img.Data) < 1000 {
 			t.Errorf("image[%d]: suspiciously small (%d bytes)", i, len(img.Data))
 		}
@@ -103,6 +105,7 @@ func TestWriteImages_createsFiles(t *testing.T) {
 	}
 
 	dir := t.TempDir()
+
 	count, err := writeImages(dir, testMDB, images, false)
 	if err != nil {
 		t.Fatalf("writeImages: %v", err)
@@ -124,7 +127,10 @@ func TestWriteImages_createsFiles(t *testing.T) {
 
 func TestLoadSchema_legacyFixture(t *testing.T) {
 	path := "../testdata/jet35/st990426.mdb"
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
 		t.Skip("legacy fixture not available")
 	}
 

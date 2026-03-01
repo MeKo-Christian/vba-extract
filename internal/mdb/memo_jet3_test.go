@@ -38,12 +38,14 @@ func writeSyntheticJet3WithLvalRows(t *testing.T, rows map[int][]byte) string {
 }
 
 func buildLvalRef(bitmask byte, pageNum int, rowID int, memoLen int, inlineData []byte) []byte {
-	ref := make([]byte, 12)
+	ref := make([]byte, 0, 12+len(inlineData))
+	ref = append(ref, make([]byte, 12)...)
 	ref[0] = byte(memoLen)
 	ref[1] = byte(memoLen >> 8)
 	ref[2] = byte(memoLen >> 16)
 	ref[3] = bitmask
 	binary.LittleEndian.PutUint32(ref[4:], uint32(pageNum<<8|rowID))
+
 	if bitmask == LvalInline && len(inlineData) > 0 {
 		ref = append(ref, inlineData...)
 	}
@@ -58,9 +60,11 @@ func TestResolveMemoJet3Inline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	raw := buildLvalRef(LvalInline, 0, 0, 5, []byte("HELLO"))
+
 	got, err := db.ResolveMemo(raw)
 	if err != nil {
 		t.Fatalf("ResolveMemo: %v", err)
@@ -80,9 +84,11 @@ func TestResolveMemoJet3SinglePage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	raw := buildLvalRef(LvalSingle, 3, 0, 5, nil)
+
 	got, err := db.ResolveMemo(raw)
 	if err != nil {
 		t.Fatalf("ResolveMemo: %v", err)
@@ -97,7 +103,9 @@ func TestResolveMemoJet3MultiPageChain(t *testing.T) {
 	nextPtr := make([]byte, 4)
 	binary.LittleEndian.PutUint32(nextPtr, uint32(4<<8))
 
-	row3 := append(nextPtr, []byte("AB")...)
+	row3 := make([]byte, 0, len(nextPtr)+2)
+	row3 = append(row3, nextPtr...)
+	row3 = append(row3, []byte("AB")...)
 	row4 := append([]byte{0, 0, 0, 0}, []byte("CD")...)
 
 	path := writeSyntheticJet3WithLvalRows(t, map[int][]byte{
@@ -109,9 +117,11 @@ func TestResolveMemoJet3MultiPageChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	raw := buildLvalRef(LvalMultiPage, 3, 0, 4, nil)
+
 	got, err := db.ResolveMemo(raw)
 	if err != nil {
 		t.Fatalf("ResolveMemo: %v", err)
@@ -131,9 +141,11 @@ func TestResolveMemoJet3SinglePageRowOutOfRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	raw := buildLvalRef(LvalSingle, 3, 1, 5, nil) // row 1, but only one row exists
+
 	_, err = db.ResolveMemo(raw)
 	if err == nil || !strings.Contains(err.Error(), "out of range") {
 		t.Fatalf("ResolveMemo error = %v, want row out-of-range error", err)
@@ -143,7 +155,9 @@ func TestResolveMemoJet3SinglePageRowOutOfRange(t *testing.T) {
 func TestResolveMemoJet3MultiPageInvalidNextPageType(t *testing.T) {
 	nextPtr := make([]byte, 4)
 	binary.LittleEndian.PutUint32(nextPtr, uint32(4<<8))
-	row3 := append(nextPtr, []byte("AB")...)
+	row3 := make([]byte, 0, len(nextPtr)+2)
+	row3 = append(row3, nextPtr...)
+	row3 = append(row3, []byte("AB")...)
 
 	// page 4 is intentionally not initialized as data page
 	path := writeSyntheticJet3WithLvalRows(t, map[int][]byte{
@@ -154,9 +168,11 @@ func TestResolveMemoJet3MultiPageInvalidNextPageType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	raw := buildLvalRef(LvalMultiPage, 3, 0, 4, nil)
+
 	_, err = db.ResolveMemo(raw)
 	if err == nil || !strings.Contains(err.Error(), "not data/LVAL") {
 		t.Fatalf("ResolveMemo error = %v, want invalid next page type error", err)
@@ -173,9 +189,11 @@ func TestResolveMemoJet3MultiPageRecordTooShort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
+
 	t.Cleanup(func() { _ = db.Close() })
 
 	raw := buildLvalRef(LvalMultiPage, 3, 0, 2, nil)
+
 	_, err = db.ResolveMemo(raw)
 	if err == nil || !strings.Contains(err.Error(), "record too short") {
 		t.Fatalf("ResolveMemo error = %v, want record-too-short error", err)

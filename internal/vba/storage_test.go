@@ -7,14 +7,14 @@ import (
 	"github.com/MeKo-Christian/accessdump/internal/mdb"
 )
 
-const testMDB = "../../testdata/Start.mdb"
+const testMDB = "../../testdata/sample.mdb"
 
 func testDB(t *testing.T) *mdb.Database {
 	t.Helper()
 
 	_, err := os.Stat(testMDB)
 	if os.IsNotExist(err) {
-		t.Skip("testdata/Start.mdb not available")
+		t.Skip("testdata/sample.mdb not available")
 	}
 
 	db, err := mdb.Open(testMDB)

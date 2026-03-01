@@ -31,15 +31,18 @@ var infoCmd = &cobra.Command{
 
 		names, _ := db.TableNames()
 		sort.Strings(names)
+
 		layout := layoutClass(db.PageSize(), db.Header.JetVersion)
 
 		fmt.Fprintf(out, "file: %s\n", args[0])
 		fmt.Fprintf(out, "jetVersion: %d\n", db.Header.JetVersion)
 		fmt.Fprintf(out, "pageSize: %d\n", db.PageSize())
 		fmt.Fprintf(out, "layoutClass: %s\n", layout)
+
 		if hint := layoutHint(layout); hint != "" {
 			fmt.Fprintf(out, "layoutHint: %s\n", hint)
 		}
+
 		fmt.Fprintf(out, "codepage: %d\n", db.Header.CodePage)
 		fmt.Fprintf(out, "pageCount: %d\n", db.PageCount())
 		fmt.Fprintf(out, "tableCount: %d\n", len(names))

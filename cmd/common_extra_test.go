@@ -24,8 +24,16 @@ func TestExpandArg_noGlob_returnsArg(t *testing.T) {
 
 func TestExpandArg_glob_matchesFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.mdb"), []byte{}, 0o600)
-	os.WriteFile(filepath.Join(dir, "b.mdb"), []byte{}, 0o600)
+
+	err := os.WriteFile(filepath.Join(dir, "a.mdb"), []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile a.mdb: %v", err)
+	}
+
+	err = os.WriteFile(filepath.Join(dir, "b.mdb"), []byte{}, 0o600)
+	if err != nil {
+		t.Fatalf("WriteFile b.mdb: %v", err)
+	}
 
 	got, err := expandArg(filepath.Join(dir, "*.mdb"))
 	if err != nil {
@@ -65,11 +73,13 @@ func TestWriteModules_createsFiles(t *testing.T) {
 	// Files should be in a subdirectory named after the db
 	subDir := filepath.Join(dir, "mydb")
 
-	if _, err := os.Stat(filepath.Join(subDir, "Module1.bas")); err != nil {
+	_, err = os.Stat(filepath.Join(subDir, "Module1.bas"))
+	if err != nil {
 		t.Errorf("expected Module1.bas, got error: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(subDir, "Class1.cls")); err != nil {
+	_, err = os.Stat(filepath.Join(subDir, "Class1.cls"))
+	if err != nil {
 		t.Errorf("expected Class1.cls, got error: %v", err)
 	}
 }
@@ -85,7 +95,8 @@ func TestWriteModules_flatModeWritesDirectlyToBaseDir(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "Util.bas")); err != nil {
+	_, err = os.Stat(filepath.Join(dir, "Util.bas"))
+	if err != nil {
 		t.Errorf("expected Util.bas directly in base dir: %v", err)
 	}
 }
@@ -119,10 +130,12 @@ func TestWriteModules_sanitisesIllegalNameChars(t *testing.T) {
 
 	entries, _ := os.ReadDir(dir)
 	foundModule := false
+
 	for _, entry := range entries {
 		name := entry.Name()
 		if strings.HasSuffix(name, ".bas") {
 			foundModule = true
+
 			if strings.Contains(name, "/") {
 				t.Errorf("slash should be replaced in filename: %q", name)
 			}
@@ -139,6 +152,7 @@ func TestWriteModules_sanitisesIllegalNameChars(t *testing.T) {
 func TestDefaultOutputDir_usesGlobalWhenSet(t *testing.T) {
 	orig := outputDir
 	outputDir = "/custom/output"
+
 	defer func() { outputDir = orig }()
 
 	if got := defaultOutputDir(); got != "/custom/output" {
@@ -149,6 +163,7 @@ func TestDefaultOutputDir_usesGlobalWhenSet(t *testing.T) {
 func TestDefaultOutputDir_fallsBackToVbaOutput(t *testing.T) {
 	orig := outputDir
 	outputDir = ""
+
 	defer func() { outputDir = orig }()
 
 	got := defaultOutputDir()

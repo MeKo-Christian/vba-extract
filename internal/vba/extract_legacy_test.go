@@ -12,7 +12,10 @@ import (
 
 func TestExtractAllModulesFromLegacyFixture(t *testing.T) {
 	path := filepath.Join("..", "..", "testdata", "jet35", "st990426.mdb")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
 		t.Skipf("legacy fixture not present: %s", path)
 	}
 
@@ -51,6 +54,7 @@ func TestExtractAllModulesFromLegacyFixture(t *testing.T) {
 
 	hasNamed := false
 	hasVBName := false
+
 	for _, m := range modules {
 		if strings.TrimSpace(m.Name) != "" {
 			hasNamed = true

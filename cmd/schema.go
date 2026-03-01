@@ -69,7 +69,7 @@ var schemaCmd = &cobra.Command{
 				continue
 			}
 
-			writeErr := writeSchema(baseOut, file, schema, schemaFlat || format == "flat", schemaOverwriteReadme)
+			writeErr := writeSchema(baseOut, file, schema, schemaFlat || format == outputFormatFlat, schemaOverwriteReadme)
 			if writeErr != nil {
 				failed++
 
@@ -141,7 +141,8 @@ func writeSchemaReadme(targetDir, dbPath string, schema *mdb.Schema, overwrite b
 	readmePath := filepath.Join(targetDir, "README.md")
 
 	if !overwrite {
-		if _, err := os.Stat(readmePath); err == nil {
+		_, err := os.Stat(readmePath)
+		if err == nil {
 			return nil
 		}
 	}

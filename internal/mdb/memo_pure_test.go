@@ -9,8 +9,9 @@ import (
 // short-circuit paths (inline, len<12) don't need page I/O.
 func openJet4DB(t *testing.T) *Database {
 	t.Helper()
-	// Use the real Start.mdb so we have an open Jet4 db for inline tests.
+	// Use the real sample.mdb so we have an open Jet4 db for inline tests.
 	db := testDB(t)
+
 	return db
 }
 
@@ -48,6 +49,7 @@ func TestResolveMemo_shortInlineData(t *testing.T) {
 	db := openJet4DB(t)
 
 	payload := []byte{0xAA, 0xBB, 0xCC}
+
 	got, err := db.ResolveMemo(payload)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
