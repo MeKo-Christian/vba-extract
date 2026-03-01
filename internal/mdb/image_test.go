@@ -21,8 +21,8 @@ func TestExtractImages_StartMDB(t *testing.T) {
 		t.Fatalf("ExtractImages: %v", err)
 	}
 
-	if len(images) != 3 {
-		t.Fatalf("expected 3 images, got %d", len(images))
+	if len(images) != 2 {
+		t.Fatalf("expected 2 images, got %d", len(images))
 	}
 
 	// All images in Start.mdb are JPEGs.

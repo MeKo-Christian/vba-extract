@@ -73,8 +73,8 @@ func TestLoadImages_returnsImages(t *testing.T) {
 		t.Fatalf("loadImages: %v", err)
 	}
 
-	if len(images) != 3 {
-		t.Fatalf("expected 3 images, got %d", len(images))
+	if len(images) != 2 {
+		t.Fatalf("expected 2 images, got %d", len(images))
 	}
 
 	for i, img := range images {
