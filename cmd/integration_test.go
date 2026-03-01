@@ -63,6 +63,65 @@ func TestLoadSchema_missingFile(t *testing.T) {
 	}
 }
 
+// loadImages
+
+func TestLoadImages_returnsImages(t *testing.T) {
+	skipIfNoFixture(t)
+
+	images, err := loadImages(testMDB)
+	if err != nil {
+		t.Fatalf("loadImages: %v", err)
+	}
+
+	if len(images) != 3 {
+		t.Fatalf("expected 3 images, got %d", len(images))
+	}
+
+	for i, img := range images {
+		if img.Format != "jpeg" {
+			t.Errorf("image[%d]: expected jpeg, got %s", i, img.Format)
+		}
+		if len(img.Data) < 1000 {
+			t.Errorf("image[%d]: suspiciously small (%d bytes)", i, len(img.Data))
+		}
+	}
+}
+
+func TestLoadImages_missingFile(t *testing.T) {
+	_, err := loadImages("/nonexistent/path.mdb")
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}
+
+func TestWriteImages_createsFiles(t *testing.T) {
+	skipIfNoFixture(t)
+
+	images, err := loadImages(testMDB)
+	if err != nil {
+		t.Fatalf("loadImages: %v", err)
+	}
+
+	dir := t.TempDir()
+	count, err := writeImages(dir, testMDB, images, false)
+	if err != nil {
+		t.Fatalf("writeImages: %v", err)
+	}
+
+	if count != len(images) {
+		t.Errorf("expected %d written, got %d", len(images), count)
+	}
+
+	entries, err := os.ReadDir(dir + "/Start/images")
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+
+	if len(entries) != count {
+		t.Errorf("expected %d files on disk, got %d", count, len(entries))
+	}
+}
+
 func TestLoadSchema_legacyFixture(t *testing.T) {
 	path := "../testdata/jet35/st990426.mdb"
 	if _, err := os.Stat(path); os.IsNotExist(err) {
