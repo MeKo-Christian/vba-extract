@@ -165,6 +165,72 @@ func TestRenderDDL_queryWithEmptySQL(t *testing.T) {
 	}
 }
 
+// writeFormMarkdown
+
+func TestWriteFormMarkdown_empty(t *testing.T) {
+	var b strings.Builder
+	writeFormMarkdown(&b, nil)
+
+	if b.Len() != 0 {
+		t.Errorf("expected no output for nil forms, got: %q", b.String())
+	}
+}
+
+func TestWriteFormMarkdown_formWithRecordSource(t *testing.T) {
+	var b strings.Builder
+	forms := []mdb.FormMeta{
+		{Name: "Orders", RecordSource: "SELECT * FROM Orders;"},
+	}
+
+	writeFormMarkdown(&b, forms)
+	out := b.String()
+
+	if !strings.Contains(out, "## Forms") {
+		t.Errorf("expected ## Forms heading, got: %q", out)
+	}
+
+	if !strings.Contains(out, "### Orders") {
+		t.Errorf("expected form name heading, got: %q", out)
+	}
+
+	if !strings.Contains(out, "SELECT * FROM Orders;") {
+		t.Errorf("expected RecordSource SQL in output, got: %q", out)
+	}
+}
+
+func TestWriteFormMarkdown_formWithEventHandlers(t *testing.T) {
+	var b strings.Builder
+	forms := []mdb.FormMeta{
+		{Name: "Startschirm", EventHandlers: []string{"[Event Procedure]", "=HandleButtonClick(1)"}},
+	}
+
+	writeFormMarkdown(&b, forms)
+	out := b.String()
+
+	if !strings.Contains(out, "[Event Procedure]") {
+		t.Errorf("expected event handler in output, got: %q", out)
+	}
+
+	if !strings.Contains(out, "=HandleButtonClick(1)") {
+		t.Errorf("expected expression event in output, got: %q", out)
+	}
+}
+
+func TestWriteFormMarkdown_formWithNoMetadata(t *testing.T) {
+	var b strings.Builder
+	forms := []mdb.FormMeta{
+		{Name: "Bare"},
+	}
+
+	writeFormMarkdown(&b, forms)
+	out := b.String()
+
+	// Form with no RecordSource or EventHandlers should still appear.
+	if !strings.Contains(out, "### Bare") {
+		t.Errorf("expected bare form name heading, got: %q", out)
+	}
+}
+
 // renderMarkdown
 
 func TestRenderMarkdown_heading(t *testing.T) {

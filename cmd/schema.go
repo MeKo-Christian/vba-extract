@@ -241,8 +241,33 @@ func renderMarkdown(dbName string, s *mdb.Schema) string {
 	writeTableMarkdown(&b, s.Tables)
 	writeRelationshipMarkdown(&b, s.Relationships)
 	writeQueryMarkdown(&b, s.Queries)
+	writeFormMarkdown(&b, s.Forms)
 
 	return b.String()
+}
+
+func writeFormMarkdown(b *strings.Builder, forms []mdb.FormMeta) {
+	if len(forms) == 0 {
+		return
+	}
+
+	fmt.Fprintf(b, "## Forms\n\n")
+
+	for _, f := range forms {
+		fmt.Fprintf(b, "### %s\n\n", f.Name)
+
+		if f.RecordSource != "" {
+			fmt.Fprintf(b, "**Record source:** `%s`\n\n", f.RecordSource)
+		}
+
+		if len(f.EventHandlers) > 0 {
+			fmt.Fprintf(b, "**Event handlers:**\n\n")
+			for _, e := range f.EventHandlers {
+				fmt.Fprintf(b, "- `%s`\n", e)
+			}
+			fmt.Fprintf(b, "\n")
+		}
+	}
 }
 
 func writeTableMarkdown(b *strings.Builder, tables []mdb.TableSchema) {

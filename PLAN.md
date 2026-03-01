@@ -139,19 +139,20 @@ The immediate validation case is IPOffice `Start.mdb`, but the roadmap should st
 
 - [x] Image extraction from form blobs implemented (`internal/mdb/image.go`)
 - [x] Form names parsed from storage dir data (`parseFormDirData`)
-- [ ] Investigate extraction of full form/report metadata beyond code-behind modules:
-  - [ ] Control names and types
-  - [ ] Event bindings (OnClick, OnOpen, OnTimer, …)
-  - [ ] Data source / record source if recoverable
-  - [ ] Startup form / AutoExec references if present
-- [ ] Define stable output format for UI metadata:
-  - [ ] Markdown summary for humans
-  - [ ] JSON for tools
+- [x] Heuristic UTF-16LE blob scanner extracts UI metadata without full format parsing (`internal/mdb/form_meta.go`):
+  - [x] Event bindings: `[Event Procedure]` markers and `=Expr()` expressions
+  - [x] Data source / record source (SELECT statements recovered from blob)
+  - [ ] Control names and types (partially: names extracted, types not classified)
+  - [ ] Startup form / AutoExec references (covered partially via event expressions)
+- [x] `FormMeta` struct added to `Schema` (`Forms []FormMeta`)
+- [x] `ReadSchema` populates `Forms` via `ScanFormBlobs` (best-effort, silent on missing table)
+- [x] Markdown output renders `## Forms` section with RecordSource and event handlers
+- [x] Unit tests for `scanBlobStrings`, `classifyBlobStrings`, and integration test against `Start.mdb`
+- [ ] Define stable JSON output for form metadata (Phase D dependency)
 - [ ] Add fixtures/tests for forms with:
-  - [ ] Button click handlers
-  - [ ] Navigation trees/lists
-  - [ ] Bound controls
+  - [ ] Button click handlers with specific handler names
   - [ ] Timer/startup behavior
+  - [ ] Bound controls with table/column RecordSource
 
 ## Phase D: Structured Migration Outputs
 

@@ -12,6 +12,7 @@ type Schema struct {
 	Tables        []TableSchema
 	Relationships []Relationship
 	Queries       []QueryDef
+	Forms         []FormMeta
 }
 
 // TableSchema describes one user table.
@@ -108,6 +109,9 @@ func (db *Database) ReadSchema() (*Schema, error) {
 
 	s.Relationships = db.readRelationships()
 	s.Queries = db.readQueries(queryNames)
+
+	// Form metadata is best-effort; ignore errors (MSysAccessStorage may be absent).
+	s.Forms, _ = ScanFormBlobs(db)
 
 	return s, nil
 }
