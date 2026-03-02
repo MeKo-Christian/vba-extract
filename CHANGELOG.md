@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.4.0]
+
 ### Added
+- `extract` package: public Go library API for extracting VBA modules programmatically.
+  Import `github.com/MeKo-Christian/accessdump/extract` and call `extract.Extract(path, logger)`.
 - Jet3 parser coverage for table definition, row decoding, and MEMO/LVAL traversal.
 - Jet3 VBA extraction regression tests:
   - synthetic 2K forensic scanner path
